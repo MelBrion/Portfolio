@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <meta name="description" content="Romel — creative developer, designer, and digital problem solver.">
+  <meta name="theme-color" content="#080C16">
+  <title>Romel | Creative Developer</title>
+  <!-- Saved niche presets (written by the admin "Save niche" button) -->
+  <script src="niches.js"></script>
+  <script>
+    /* Apply a niche before anything renders: ?niche=slug, else the niche already loaded here, else the default.
+       Re-applies only when switching niche or when that niche was re-saved, so unsaved admin edits survive reloads. */
+    (function () {
+      try {
+        var N = window.ROMEL_NICHES, ls = localStorage;
+        if (!N || !N.niches) return;
+        // V2 text edits are still accepted from older saved niches; the page upgrades them to V3 on load
+        var KEYS = ['romelPageEditsV3', 'romelPageEditsV2', 'romelHiddenSections', 'romelPortfolioContent', 'romelTheme', 'romelThemeColors', 'romelThemeCache', 'romelLogo', 'romelBrand', 'romelTools', 'romelFocus', 'romelServices', 'romelCards', 'romelHero', 'romelImages', 'romelResume'];
+        var asked = new URLSearchParams(location.search).get('niche'), active = ls.getItem('romelActiveNiche');
+        var pending = JSON.parse(ls.getItem('romelPendingNiche') || 'null');
+        if (!asked && pending && pending.slug === active) return; // a new niche being set up, not saved yet
+        var slug = asked && N.niches[asked] ? asked : (active && N.niches[active] ? active : N.default);
+        var n = slug && N.niches[slug];
+        if (!n) return;
+        var version = String(n.updatedAt || 0);
+        if (slug === active && ls.getItem('romelNicheVersion') === version) return;
+        KEYS.forEach(function (k) { ls.removeItem(k); });
+        Object.keys(n.settings || {}).forEach(function (k) { if (KEYS.indexOf(k) > -1) ls.setItem(k, n.settings[k]); });
+        ls.setItem('romelActiveNiche', slug);
+        ls.setItem('romelNicheVersion', version);
+      } catch (e) {}
+    })();
+  </script>
+  <script>try{var h=document.documentElement,t=localStorage.getItem('romelTheme')||'dark';if(t==='emerald')t='sunny';if(['slate','midnight','ocean','sunny'].indexOf(t)>-1)h.classList.add('theme-'+t);var light=t==='slate'||t==='sunny',c=JSON.parse(localStorage.getItem('romelThemeCache')||'null');if(c&&c.theme===t){h.style.cssText+=';'+c.css;light=c.light;if(c.neon&&!light)h.classList.add('is-neon')}if(light)h.classList.add('is-light')}catch(e){}</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,400;1,600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- Preloader -->
+  <div id="pageLoader" class="loader" aria-hidden="true">
+    <div class="loader-radar">
+      <span class="ring ring-ping"></span>
+      <span class="ring ring-pulse"></span>
+      <span class="ring ring-spin"></span>
+      <div class="loader-core">R</div>
+    </div>
+    <div class="loader-title gradient-text" data-brand="plain">ROMEL BRIONES</div>
+    <div class="loader-sub"><i class="live-dot"></i><span>INITIALIZING CREATIVE WORKSPACE...</span></div>
+    <div class="loader-bar"><span></span></div>
+  </div>
+
+  <!-- Background FX -->
+  <div id="cursorDot"></div>
+  <div id="cursorGlow"></div>
+  <div class="grid-overlay" aria-hidden="true"></div>
+  <div class="ambient" aria-hidden="true">
+    <div class="scan-beam"></div>
+    <span class="blob blob-1"></span>
+    <span class="blob blob-2"></span>
+    <span class="blob blob-3"></span>
+    <span class="blob blob-4"></span>
+  </div>
+  <canvas id="bgCanvas" aria-hidden="true"></canvas>
+  <div id="scrollProgress"><span id="scrollProgressBar"></span></div>
+
+  <!-- Header -->
+  <header class="site-header">
+    <div class="header-inner">
+      <a class="brand nav-link" href="#hero" aria-label="Romel home">
+        <img class="brand-logo" src="romel-logo.svg" alt="Romelito Briones circuit logo">
+        <span class="brand-text">
+          <span class="brand-name" data-brand="name"><span class="gradient-text">ROMELITO BRIONES</span></span>
+          <small data-brand="tagline">CREATIVE DEVELOPER</small>
+        </span>
+      </a>
+
+      <nav class="desktop-nav portfolio-tabs" id="navLinks" aria-label="Main navigation">
+        <a href="#about" class="nav-link nav-btn">RESUME &amp; BIO</a>
+        <a href="#services" class="nav-link nav-btn">STACK</a>
+        <a href="#agents" class="nav-link nav-btn">AI AGENTS</a>
+        <a href="#calendars" class="nav-link nav-btn">CALENDARS</a>
+        <a href="#workflows" class="nav-link nav-btn">WORKFLOWS</a>
+        <a href="#integrations" class="nav-link nav-btn">API &amp; WEBHOOKS</a>
+        <a href="#funnels" class="nav-link nav-btn">FUNNELs</a>
+        <a href="#approvals" class="nav-link nav-btn">A2P APPROVALS</a>
+      </nav>
+
+      <div class="header-actions">
+        <button class="btn btn-primary btn-sm hide-xs" type="button" data-open="cvModal"><i class="fa-solid fa-file-arrow-down"></i><span>My Resume</span></button>
+        <a class="btn btn-outline btn-sm nav-link hide-xs" href="#contact"><span>Let's Talk</span><i class="fa-solid fa-paper-plane accent"></i></a>
+        <div class="account-menu hide-xs" id="accountMenu">
+          <button class="account-trigger" id="accountButton" type="button" aria-haspopup="menu" aria-expanded="false">
+            <i class="fa-solid fa-user-lock" id="accountIcon"></i>
+            <span id="accountLabel" class="hide-sm">Account</span>
+            <i class="fa-solid fa-chevron-down caret"></i>
+          </button>
+          <div class="account-dropdown" id="accountDropdown" role="menu" hidden>
+            <span class="dropdown-label">VIEW AS</span>
+            <button type="button" role="menuitem" data-role="admin">
+              <i class="fa-solid fa-user-shield"></i>
+              <span><strong>Admin</strong><small>View &amp; control everything</small></span>
+              <i class="fa-solid fa-check tick"></i>
+            </button>
+            <button type="button" role="menuitem" data-role="client">
+              <i class="fa-solid fa-user"></i>
+              <span><strong>Client</strong><small>View the client page only</small></span>
+              <i class="fa-solid fa-check tick"></i>
+            </button>
+            <button type="button" role="menuitem" data-role="signout" class="signout" hidden>
+              <i class="fa-solid fa-right-from-bracket"></i>
+              <span><strong>Sign out</strong></span>
+            </button>
+          </div>
+        </div>
+        <button class="menu-button" id="menuButton" type="button" aria-label="Open menu" aria-expanded="false"><i class="fa-solid fa-bars"></i></button>
+      </div>
+    </div>
+
+    <div class="mobile-menu" id="mobileMenu" hidden>
+      <nav class="portfolio-tabs" aria-label="Mobile navigation">
+        <a href="#about" class="nav-link">RESUME &amp; BIO</a>
+        <a href="#services" class="nav-link">STACK</a>
+        <a href="#agents" class="nav-link">AI AGENTS</a>
+        <a href="#calendars" class="nav-link">CALENDARS</a>
+        <a href="#workflows" class="nav-link">WORKFLOWS</a>
+        <a href="#integrations" class="nav-link">API &amp; WEBHOOKS</a>
+        <a href="#funnels" class="nav-link">FUNNELs</a>
+        <a href="#approvals" class="nav-link">A2P APPROVALS</a>
+      </nav>
+      <button class="btn btn-primary btn-block" type="button" data-open="cvModal"><i class="fa-solid fa-file-arrow-down"></i><span>My Resume</span></button>
+      <div class="mobile-roles">
+        <span>VIEW AS</span>
+        <div>
+          <button type="button" data-role="admin"><i class="fa-solid fa-user-shield"></i>Admin</button>
+          <button type="button" data-role="client"><i class="fa-solid fa-user"></i>Client</button>
+          <button type="button" data-role="signout" class="signout" hidden><i class="fa-solid fa-right-from-bracket"></i>Sign out</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Hero -->
+    <section class="hero" id="hero">
+      <div class="container hero-grid">
+        <div class="hero-copy">
+          <div class="pill-badge entrance-1"><span class="ping-dot"></span><span>Available for select projects</span></div>
+          <h1 class="hero-title entrance-2" id="heroHeadline">I build <span class="gradient-text">digital experiences</span> that matter.</h1>
+          <p class="hero-desc entrance-3" id="heroDescription">Creative developer and digital designer turning ambitious ideas into fast, thoughtful, and memorable products.</p>
+
+          <div class="stat-grid entrance-3">
+            <div class="card stat"><strong class="c-turq">3+</strong><span>Years Building</span></div>
+            <div class="card stat"><strong class="c-biloba">25+</strong><span>Projects Shipped</span></div>
+            <div class="card stat"><strong class="c-mint">100%</strong><span>Committed</span></div>
+            <div class="card stat"><strong class="c-biloba">∞</strong><span>Curiosity</span></div>
+          </div>
+
+          <div class="hero-actions entrance-4">
+            <a class="btn btn-primary nav-link" href="#contact"><i class="fa-solid fa-calendar-check"></i><span>Start a Project</span></a>
+            <a class="btn btn-outline nav-link" href="#funnels"><i class="fa-solid fa-play accent"></i><span>View My Work</span></a>
+          </div>
+        </div>
+
+        <div class="hero-visual entrance-4">
+          <div class="ring-glow portrait">
+            <img class="portrait-photo" src="Romel Photo.jpg" alt="Portrait of Romelito Briones" draggable="false">
+            <div class="portrait-overlay">
+              <div>
+                <h3 data-content="name">Romelito Briones</h3>
+                <p data-content="role">CREATIVE DEVELOPER</p>
+              </div>
+              <span class="check-chip"><i class="fa-solid fa-check"></i></span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- About / Resume -->
+    <section class="section" id="about">
+      <div class="container">
+        <div class="section-head reveal">
+          <div class="section-tag"><i class="fa-solid fa-address-card"></i> Resume &amp; Bio</div>
+          <h2>About <span data-content="name">Romelito Briones</span></h2>
+          <p>Design-minded. Code-powered. I bridge the gap between design and engineering, creating digital work with purpose, personality, and polish.</p>
+        </div>
+
+        <div class="about-grid">
+          <div class="stack-col">
+            <article class="card pad-lg accent-left reveal">
+              <div class="card-title-row">
+                <div class="icon-box"><i class="fa-solid fa-compass-drafting"></i></div>
+                <div>
+                  <h3>The Story</h3>
+                  <p class="mono-sub">Design discipline &bull; Engineering craft</p>
+                </div>
+              </div>
+              <p class="quote">"I'm Romel, a multidisciplinary creator focused on building beautiful websites, intuitive interfaces, and reliable digital systems. Every project begins with listening and ends with details that feel effortless — turning complex problems into simple, useful experiences."</p>
+              <div class="info-list">
+                <div><i class="fa-solid fa-envelope"></i><a href="mailto:melbrionvirtual@gmail.com">melbrionvirtual@gmail.com</a></div>
+                <div><i class="fa-brands fa-linkedin"></i><a href="#" target="_blank" rel="noopener noreferrer">LinkedIn</a></div>
+                <div><i class="fa-brands fa-github"></i><a href="#" target="_blank" rel="noopener noreferrer">GitHub</a></div>
+                <div><i class="fa-brands fa-instagram"></i><a href="#" target="_blank" rel="noopener noreferrer">Instagram</a></div>
+              </div>
+            </article>
+
+            <article class="card pad-md reveal">
+              <div class="card-title-row">
+                <div class="mini-icon c-biloba-bg"><i class="fa-solid fa-quote-left"></i></div>
+                <div>
+                  <h4>Good design is not just how it looks.</h4>
+                  <p class="muted small">It's how clearly it works.</p>
+                </div>
+              </div>
+            </article>
+          </div>
+
+          <div class="stack-col">
+            <article class="card pad-md overflow-hidden reveal">
+              <div class="mono-label"><i class="fa-solid fa-microchip"></i><span>Applications &amp; Technologies</span></div>
+              <p class="muted small">Tools and platforms behind every build</p>
+              <div class="marquee">
+                <div class="marquee-track" id="marqueeTrack"></div>
+              </div>
+              <div class="marquee">
+                <div class="marquee-track reverse" id="marqueeTrackReverse"></div>
+              </div>
+            </article>
+
+            <article class="card pad-lg reveal">
+              <div class="card-title-row between">
+                <div class="card-title-row">
+                  <div class="icon-box" id="focusIcon"><i class="fa-solid fa-briefcase"></i></div>
+                  <div>
+                    <h3>Current Focus</h3>
+                    <p class="mono-sub">Creative Developer &bull; Freelance</p>
+                  </div>
+                </div>
+                <span class="status-pill"><i class="live-dot"></i>Active</span>
+              </div>
+              <ul class="check-list" id="focusList">
+                <li><i class="fa-solid fa-circle-check"></i>Responsive, accessible, high-performance websites built for real business goals.</li>
+                <li><i class="fa-solid fa-circle-check"></i>Clear user journeys and polished interfaces rooted in usability and visual craft.</li>
+                <li><i class="fa-solid fa-circle-check"></i>Distinct visual systems that help products communicate with confidence.</li>
+                <li><i class="fa-solid fa-circle-check"></i>Smart automations and tools that make teams faster and more efficient.</li>
+              </ul>
+            </article>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Stack / Services -->
+    <section class="section" id="services">
+      <div class="container">
+        <div class="section-head reveal">
+          <div class="section-tag"><i class="fa-solid fa-network-wired"></i> Stack &amp; Expertise</div>
+          <h2>What I can do.</h2>
+          <p>From first sketch to final launch, I bring strategy, craft, and technology together.</p>
+        </div>
+
+        <div class="card-grid cols-4" id="servicesGrid">
+          <article class="card pad-md service reveal">
+            <div>
+              <div class="icon-box"><i class="fa-solid fa-code"></i></div>
+              <h3>Web Development</h3>
+              <p>Responsive, accessible, high-performance websites built for real business goals.</p>
+            </div>
+            <div class="card-foot"><a class="nav-link link-accent" href="#funnels">View builds &rarr;</a></div>
+          </article>
+          <article class="card pad-md service reveal">
+            <div>
+              <div class="icon-box"><i class="fa-solid fa-pen-ruler"></i></div>
+              <h3>UI / UX Design</h3>
+              <p>Clear user journeys and polished interfaces rooted in usability and visual craft.</p>
+            </div>
+            <div class="card-foot"><a class="nav-link link-accent" href="#funnels">See projects &rarr;</a></div>
+          </article>
+          <article class="card pad-md service reveal">
+            <div>
+              <div class="icon-box"><i class="fa-solid fa-swatchbook"></i></div>
+              <h3>Brand Identity</h3>
+              <p>Distinct visual systems that help products communicate with clarity and confidence.</p>
+            </div>
+            <div class="card-foot"><a class="nav-link link-biloba" href="#funnels">Arc Space case &rarr;</a></div>
+          </article>
+          <article class="card pad-md service reveal">
+            <div>
+              <div class="icon-box"><i class="fa-solid fa-diagram-project"></i></div>
+              <h3>Digital Systems</h3>
+              <p>Smart automations and tools that make teams faster, smoother, and more efficient.</p>
+            </div>
+            <div class="card-foot"><a class="nav-link link-mint" href="#workflows">Explore workflows &rarr;</a></div>
+          </article>
+        </div>
+
+        <article class="card pad-lg stack-card reveal">
+          <div class="card-title-row between wrap">
+            <div class="card-title-row">
+              <div class="icon-box"><i class="fa-solid fa-layer-group"></i></div>
+              <div>
+                <h3>Full Ecosystem</h3>
+                <p class="mono-sub">Tools I design, build &amp; automate with</p>
+              </div>
+            </div>
+            <button class="btn btn-primary btn-sm" type="button" data-open="cvModal"><i class="fa-solid fa-file-pdf"></i><span>My Resume</span></button>
+          </div>
+          <div class="stack-groups">
+            <div class="stack-group" style="--tone:var(--accent)">
+              <div class="group-label"><i class="fa-solid fa-pen-nib"></i>Design:</div>
+              <div class="chips"><span>Figma</span><span>Adobe Illustrator</span><span>Photoshop</span><span>Canva</span></div>
+            </div>
+            <div class="stack-group" style="--tone:var(--accent-2)">
+              <div class="group-label"><i class="fa-solid fa-code"></i>Frontend &amp; Dev:</div>
+              <div class="chips"><span>HTML</span><span>CSS</span><span>JavaScript</span><span>React</span><span>Tailwind CSS</span><span>Node.js</span></div>
+            </div>
+            <div class="stack-group" style="--tone:var(--biloba)">
+              <div class="group-label"><i class="fa-solid fa-gears"></i>CRM &amp; Automation:</div>
+              <div class="chips"><span>GoHighLevel</span><span>Zapier</span><span>n8n</span><span>Make.com</span><span>Webhooks</span></div>
+            </div>
+            <div class="stack-group" style="--tone:#FBBF24">
+              <div class="group-label"><i class="fa-solid fa-cloud"></i>Platforms &amp; Hosting:</div>
+              <div class="chips"><span>WordPress</span><span>Webflow</span><span>GitHub</span><span>Vercel</span><span>Cloudflare</span></div>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- AI Agents -->
+    <section class="section" id="agents">
+      <div class="container">
+        <div class="card pad-xl feature reveal">
+          <div class="feature-grid">
+            <div class="feature-copy">
+              <div class="pill-tag"><i class="fa-solid fa-wand-magic-sparkles"></i> AI Agent Builds</div>
+              <h2>Conversational AI Agents &amp;<br><span class="gradient-text-alt">24/7 Virtual Receptionists</span></h2>
+              <p>AI-powered assistants that answer questions from a knowledge base, qualify leads in natural multi-turn conversations, and book appointments straight into the calendar.</p>
+              <div class="btn-row">
+                <a class="btn btn-primary nav-link" href="#contact"><i class="fa-solid fa-robot"></i><span>Build My AI Agent</span></a>
+                <button class="btn btn-outline" type="button" data-video="" data-title="AI Agent Demo"><i class="fa-solid fa-play accent"></i><span>Watch Demo</span></button>
+              </div>
+            </div>
+            <div class="chat-mock">
+              <div class="chat-head">
+                <span>assistant.romel.dev</span>
+                <span class="live-tag">Live 24/7</span>
+              </div>
+              <div class="chat-body" id="chatDemo">
+                <div class="bubble ai">Hi! I'm Romel's AI assistant. Want to book a discovery call or ask about a project?</div>
+                <div class="bubble user">I need a new website for my studio. Are you free Thursday?</div>
+                <div class="bubble ai">Checking the calendar… Thursday at 3:00 PM is open. I've reserved it and sent you a confirmation email!</div>
+              </div>
+              <button class="chat-replay" type="button" id="chatReplay"><i class="fa-solid fa-rotate-right"></i> Replay conversation</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Calendars -->
+    <section class="section" id="calendars">
+      <div class="container">
+        <div class="section-head reveal">
+          <div class="section-tag"><i class="fa-solid fa-calendar-days"></i> Calendars</div>
+          <h2>Booking Systems That Run Themselves</h2>
+          <p>Service and rental calendars with smart availability, reminders, and zero double-bookings.</p>
+        </div>
+        <div class="split-grid">
+          <article class="card pad-lg reveal">
+            <div class="card-title-row">
+              <div class="icon-box"><i class="fa-solid fa-calendar-check"></i></div>
+              <div>
+                <h3>Services &amp; Rental Calendar</h3>
+                <p class="mono-sub">Availability &bull; Reminders &bull; Payments</p>
+              </div>
+            </div>
+            <ul class="check-list">
+              <li><i class="fa-solid fa-circle-check"></i>Slot locking to prevent double-bookings across staff and resources.</li>
+              <li><i class="fa-solid fa-circle-check"></i>Automated SMS &amp; email confirmations and reminders.</li>
+              <li><i class="fa-solid fa-circle-check"></i>Buffer times, booking windows, and custom intake forms.</li>
+              <li><i class="fa-solid fa-circle-check"></i>Synced to Google / Outlook calendars in real time.</li>
+            </ul>
+            <div class="btn-row">
+              <button class="btn btn-outline btn-sm" type="button" data-video="" data-title="Calendar Walkthrough"><i class="fa-solid fa-play accent"></i><span>Watch Walkthrough</span></button>
+            </div>
+          </article>
+          <article class="card pad-lg calendar-card reveal">
+            <div class="cal-head">
+              <strong id="calMonth">Month</strong>
+              <span class="legend"><i class="dot open"></i>Open <i class="dot booked"></i>Booked</span>
+            </div>
+            <div class="cal-grid" id="calGrid"></div>
+            <p class="cal-note" id="calNote">Select an open day to preview available slots.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Workflows -->
+    <section class="section" id="workflows">
+      <div class="container">
+        <div class="section-head reveal">
+          <div class="section-tag"><i class="fa-solid fa-diagram-project"></i> Workflows</div>
+          <h2>Automations Built</h2>
+          <p>Workflow systems that remove manual busywork and keep leads moving. Click any schema to zoom in.</p>
+        </div>
+
+        <div class="filter-row reveal">
+          <button class="filter-btn active" type="button" data-filter="ghl"><i class="fa-solid fa-layer-group"></i><span>GoHighLevel (<b class="count">0</b>)</span></button>
+          <button class="filter-btn" type="button" data-filter="n8n"><i class="fa-solid fa-circle-nodes"></i><span>n8n (<b class="count">0</b>)</span></button>
+          <button class="filter-btn" type="button" data-filter="zapier"><i class="fa-solid fa-bolt"></i><span>Zapier (<b class="count">0</b>)</span></button>
+        </div>
+
+        <div class="card-grid cols-3">
+          <article class="card pad-sm auto-card" data-category="ghl">
+            <div class="img-preview" data-lightbox="Lead Nurture Pipeline">
+              <img alt="Lead Nurture Pipeline schema" data-diagram="Lead Nurture Pipeline" data-steps="Form Submit|Tag Contact|Send SMS|Wait 1 Day|Book Call">
+              <span class="corner-tag">GHL</span>
+              <div class="img-overlay"><span><i class="fa-solid fa-magnifying-glass-plus"></i> Zoom Schema</span></div>
+            </div>
+            <div class="auto-title"><span class="mini-icon"><i class="fa-solid fa-filter"></i></span><h3>Lead Nurture Pipeline</h3></div>
+            <p>Captures new leads, tags them by source, and runs a timed SMS + email sequence until they book.</p>
+            <div class="tags"><span class="accent">GoHighLevel</span><span>SMS</span><span>Pipelines</span></div>
+          </article>
+          <article class="card pad-sm auto-card" data-category="ghl">
+            <div class="img-preview" data-lightbox="Missed Call Text-Back">
+              <img alt="Missed Call Text-Back schema" data-diagram="Missed Call Text-Back" data-steps="Missed Call|Check Hours|Auto Text|Notify Team">
+              <span class="corner-tag">GHL</span>
+              <div class="img-overlay"><span><i class="fa-solid fa-magnifying-glass-plus"></i> Zoom Schema</span></div>
+            </div>
+            <div class="auto-title"><span class="mini-icon"><i class="fa-solid fa-phone-slash"></i></span><h3>Missed Call Text-Back</h3></div>
+            <p>Instantly texts callers who couldn't get through, then alerts the team to follow up.</p>
+            <div class="tags"><span class="accent">GoHighLevel</span><span>Speed-to-Lead</span></div>
+          </article>
+          <article class="card pad-sm auto-card" data-category="ghl">
+            <div class="img-preview" data-lightbox="Appointment Reminders">
+              <img alt="Appointment Reminders schema" data-diagram="Appointment Reminders" data-steps="Booked|24h Email|2h SMS|Show / No-Show">
+              <span class="corner-tag">GHL</span>
+              <div class="img-overlay"><span><i class="fa-solid fa-magnifying-glass-plus"></i> Zoom Schema</span></div>
+            </div>
+            <div class="auto-title"><span class="mini-icon"><i class="fa-solid fa-bell"></i></span><h3>Appointment Reminders</h3></div>
+            <p>Multi-touch reminders that cut no-shows and route outcomes to the right follow-up.</p>
+            <div class="tags"><span class="accent">GoHighLevel</span><span>Calendars</span></div>
+          </article>
+          <article class="card pad-sm auto-card" data-category="n8n">
+            <div class="img-preview" data-lightbox="AI Content Publisher">
+              <img alt="AI Content Publisher schema" data-diagram="AI Content Publisher" data-steps="Schedule|Fetch Ideas|AI Draft|Approve|Publish">
+              <span class="corner-tag">n8n</span>
+              <div class="img-overlay"><span><i class="fa-solid fa-magnifying-glass-plus"></i> Zoom Schema</span></div>
+            </div>
+            <div class="auto-title"><span class="mini-icon"><i class="fa-solid fa-share-nodes"></i></span><h3>AI Content Publisher</h3></div>
+            <p>Drafts social posts with AI, routes them for approval, and publishes across platforms.</p>
+            <div class="tags"><span class="accent">n8n</span><span>OpenAI</span><span>Social</span></div>
+          </article>
+          <article class="card pad-sm auto-card" data-category="n8n">
+            <div class="img-preview" data-lightbox="Invoice Tracker">
+              <img alt="Invoice Tracker schema" data-diagram="Invoice Tracker" data-steps="Payment In|Parse Data|Update Sheet|Send Receipt">
+              <span class="corner-tag">n8n</span>
+              <div class="img-overlay"><span><i class="fa-solid fa-magnifying-glass-plus"></i> Zoom Schema</span></div>
+            </div>
+            <div class="auto-title"><span class="mini-icon"><i class="fa-solid fa-file-invoice-dollar"></i></span><h3>Invoice Tracker</h3></div>
+            <p>Logs every payment to a central sheet and emails a branded receipt automatically.</p>
+            <div class="tags"><span class="accent">n8n</span><span>Google Sheets</span></div>
+          </article>
+          <article class="card pad-sm auto-card" data-category="zapier">
+            <div class="img-preview" data-lightbox="Form to CRM Sync">
+              <img alt="Form to CRM Sync schema" data-diagram="Form to CRM Sync" data-steps="New Form|Format|Create Lead|Slack Alert">
+              <span class="corner-tag">Zapier</span>
+              <div class="img-overlay"><span><i class="fa-solid fa-magnifying-glass-plus"></i> Zoom Schema</span></div>
+            </div>
+            <div class="auto-title"><span class="mini-icon"><i class="fa-solid fa-arrows-rotate"></i></span><h3>Form to CRM Sync</h3></div>
+            <p>Pushes website form entries into the CRM with clean field mapping and a team alert.</p>
+            <div class="tags"><span class="accent">Zapier</span><span>CRM</span><span>Slack</span></div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- API & Webhooks -->
+    <section class="section" id="integrations">
+      <div class="container">
+        <div class="section-head reveal">
+          <div class="section-tag"><i class="fa-solid fa-plug"></i> API &amp; Webhooks</div>
+          <h2>Data Bridges Between Platforms</h2>
+          <p>Custom integrations that move data reliably between the tools your business already uses.</p>
+        </div>
+        <div class="card-grid cols-2">
+          <article class="card pad-lg reveal">
+            <div class="flow">
+              <span class="flow-node">Lead Source</span><i class="fa-solid fa-arrow-right-long"></i>
+              <span class="flow-node mid">Webhook</span><i class="fa-solid fa-arrow-right-long"></i>
+              <span class="flow-node end">CRM</span>
+            </div>
+            <h3>Lead Source &rarr; Webhook &rarr; CRM</h3>
+            <p class="muted">Incoming leads are validated, enriched, and created in the CRM with custom fields mapped in real time.</p>
+            <div class="btn-row">
+              <button class="btn btn-outline btn-sm" type="button" data-lightbox-src="diagram" data-diagram-title="Lead Source to CRM" data-diagram-steps="Lead Source|Webhook|Validate|Enrich|Create Lead"><i class="fa-solid fa-magnifying-glass-plus accent"></i><span>View Schema</span></button>
+              <button class="btn btn-outline btn-sm" type="button" data-video="" data-title="Integration Walkthrough"><i class="fa-solid fa-play accent"></i><span>Watch Loom</span></button>
+            </div>
+          </article>
+          <article class="card pad-lg reveal">
+            <div class="flow">
+              <span class="flow-node">Account A</span><i class="fa-solid fa-arrow-right-long"></i>
+              <span class="flow-node mid">API</span><i class="fa-solid fa-arrow-right-long"></i>
+              <span class="flow-node end">Account B</span>
+            </div>
+            <h3>Contact Sync Between Accounts</h3>
+            <p class="muted">Two-way contact transfer between separate accounts with de-duplication and tag-based routing.</p>
+            <div class="btn-row">
+              <button class="btn btn-outline btn-sm" type="button" data-lightbox-src="diagram" data-diagram-title="Contact Sync Between Accounts" data-diagram-steps="Tag Added|API Fetch|De-duplicate|Upsert|Confirm"><i class="fa-solid fa-magnifying-glass-plus accent"></i><span>View Schema</span></button>
+              <button class="btn btn-outline btn-sm" type="button" data-video="" data-title="Contact Sync Walkthrough"><i class="fa-solid fa-play accent"></i><span>Watch Loom</span></button>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Funnels / Work -->
+    <section class="section" id="funnels">
+      <div class="container">
+        <div class="section-head reveal">
+          <div class="section-tag"><i class="fa-solid fa-window-maximize"></i> Funnels &amp; Websites</div>
+          <h2>Built with purpose.</h2>
+          <p>A selection of concepts and projects spanning web, product, and brand.</p>
+        </div>
+        <div class="card-grid cols-3">
+          <article class="card pad-sm project reveal">
+            <div class="project-art art-one"><div class="mock-browser"><div class="mock-bar"><i></i><i></i><i></i></div><div class="mock-content"><strong>NOVA</strong><span>FINANCE, REIMAGINED</span></div></div></div>
+            <div class="project-info">
+              <span class="mono-sub">FINTECH / WEB APP</span>
+              <h3>Nova Banking</h3>
+              <a class="link-accent" href="#" target="_blank" rel="noopener noreferrer">Visit Website &rarr;</a>
+            </div>
+          </article>
+          <article class="card pad-sm project reveal">
+            <div class="project-art art-two"><div class="mock-phone"><div></div><strong>AURA</strong><span>MOVE WITH PURPOSE</span></div></div>
+            <div class="project-info">
+              <span class="mono-sub">FITNESS / PRODUCT</span>
+              <h3>Aura Studio</h3>
+              <a class="link-accent" href="#" target="_blank" rel="noopener noreferrer">Visit Website &rarr;</a>
+            </div>
+          </article>
+          <article class="card pad-sm project reveal">
+            <div class="project-art art-three"><div class="brand-board"><span>ARC</span><small>ARCHITECTURE<br>&amp; INTERIORS</small></div></div>
+            <div class="project-info">
+              <span class="mono-sub">BRANDING / WEBSITE</span>
+              <h3>Arc Space</h3>
+              <a class="link-accent" href="#" target="_blank" rel="noopener noreferrer">Visit Website &rarr;</a>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- A2P Approvals -->
+    <section class="section" id="approvals">
+      <div class="container">
+        <div class="section-head reveal">
+          <div class="section-tag"><i class="fa-solid fa-shield-halved"></i> A2P Approvals</div>
+          <h2>A2P 10DLC Approvals Gallery</h2>
+          <p>Brand and campaign registrations prepared with compliant opt-in language and privacy vetting. Click to expand.</p>
+        </div>
+        <div class="card-grid cols-4">
+          <div class="img-preview tall reveal" data-lightbox="Brand Registration (sample)"><img alt="Brand registration sample" data-approval="Brand Registration"><div class="img-overlay"><span><i class="fa-solid fa-expand"></i> Click to expand</span></div></div>
+          <div class="img-preview tall reveal" data-lightbox="Campaign Approval (sample)"><img alt="Campaign approval sample" data-approval="Campaign Approval"><div class="img-overlay"><span><i class="fa-solid fa-expand"></i> Click to expand</span></div></div>
+          <div class="img-preview tall reveal" data-lightbox="Sole Proprietor (sample)"><img alt="Sole proprietor sample" data-approval="Sole Proprietor"><div class="img-overlay"><span><i class="fa-solid fa-expand"></i> Click to expand</span></div></div>
+          <div class="img-preview tall reveal" data-lightbox="Low-Volume Standard (sample)"><img alt="Low-volume standard sample" data-approval="Low-Volume Standard"><div class="img-overlay"><span><i class="fa-solid fa-expand"></i> Click to expand</span></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Contact -->
+    <section class="section" id="contact">
+      <div class="container contact-grid">
+        <div class="contact-info reveal">
+          <div class="section-tag"><i class="fa-solid fa-handshake"></i> Direct Collaboration</div>
+          <h2>Have an idea?<br><span class="gradient-text">Let's build it.</span></h2>
+          <p>Tell me about your project, challenge, or wildest idea. Pick a time for a call or send a quick brief — I'm ready to listen.</p>
+          <div class="info-cards">
+            <div><i class="fa-solid fa-envelope"></i><div><span>Direct Email</span><a href="mailto:melbrionvirtual@gmail.com">melbrionvirtual@gmail.com</a></div></div>
+            <div><i class="fa-solid fa-clock"></i><div><span>Response Time</span><strong>Within 24 hours</strong></div></div>
+            <div><i class="fa-solid fa-globe"></i><div><span>Availability</span><strong>Remote, worldwide</strong></div></div>
+          </div>
+        </div>
+
+        <div class="card pad-md contact-card reveal">
+          <div class="tab-switch">
+            <button class="tab-btn active" type="button" data-tab="tabCall"><i class="fa-solid fa-calendar-days"></i><span>Discovery Call</span></button>
+            <button class="tab-btn" type="button" data-tab="tabMessage"><i class="fa-solid fa-envelope"></i><span>Quick Message</span></button>
+          </div>
+
+          <div class="tab-panel" id="tabCall">
+            <div id="calendlyMount"></div>
+            <div class="call-fallback" id="callFallback">
+              <div class="icon-box big"><i class="fa-solid fa-calendar-check"></i></div>
+              <h3>Book a Discovery Call</h3>
+              <p class="muted">Send a quick note with a few times that work for you and I'll confirm a 30-minute call.</p>
+              <a class="btn btn-primary" id="callEmailLink" href="mailto:melbrionvirtual@gmail.com?subject=Discovery%20Call%20Request"><i class="fa-solid fa-paper-plane"></i><span>Request a Time</span></a>
+            </div>
+          </div>
+
+          <div class="tab-panel" id="tabMessage" hidden>
+            <h3>Send a Direct Project Brief</h3>
+            <p class="muted small">Fill out your details and it will open a Gmail compose window with everything formatted.</p>
+            <form id="contactForm" class="contact-form">
+              <div class="form-row">
+                <input type="text" name="name" required placeholder="Your Full Name">
+                <input type="email" name="email" required placeholder="Your Email Address">
+              </div>
+              <textarea name="message" rows="5" required placeholder="Describe your project, goals, or current bottlenecks..."></textarea>
+              <button class="btn btn-primary btn-block" type="submit"><span>Submit &amp; Compose on Gmail</span><i class="fa-solid fa-paper-plane"></i></button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <span class="brand-mark small">R</span>
+        <div><strong class="gradient-text" data-brand="plain">ROMEL</strong> &bull; <span class="accent"><span data-content="name">Romelito Briones</span> &bull; <span data-content="role">CREATIVE DEVELOPER</span></span></div>
+      </div>
+      <div class="socials">
+        <a href="#" aria-label="LinkedIn"><i class="fa-brands fa-linkedin-in"></i></a>
+        <a href="#" aria-label="GitHub"><i class="fa-brands fa-github"></i></a>
+        <a href="#" aria-label="Instagram"><i class="fa-brands fa-instagram"></i></a>
+      </div>
+      <div class="copyright">&copy; 2026 Romel. All rights reserved.</div>
+    </div>
+  </footer>
+
+  <!-- Lightbox with zoom & pan -->
+  <div class="modal" id="lightboxModal" hidden>
+    <div class="modal-box lightbox-box">
+      <div class="lightbox-head">
+        <div class="lightbox-title"><span class="mini-icon"><i class="fa-solid fa-image"></i></span><h4 id="lightboxTitle">Preview</h4></div>
+        <div class="lightbox-tools">
+          <button type="button" data-zoom="-0.25" title="Zoom Out (-)"><i class="fa-solid fa-magnifying-glass-minus accent"></i><span class="hide-xs">Zoom Out</span></button>
+          <button type="button" id="lightboxZoomLevel" class="zoom-level" title="Reset (0)">100%</button>
+          <button type="button" data-zoom="0.25" title="Zoom In (+)"><i class="fa-solid fa-magnifying-glass-plus accent"></i><span class="hide-xs">Zoom In</span></button>
+          <button type="button" id="lightboxReset" title="Fit to screen (0)"><i class="fa-solid fa-arrows-rotate"></i><span class="hide-sm">Reset</span></button>
+          <a id="lightboxDirectLink" href="#" target="_blank" rel="noopener noreferrer" title="Open in new tab"><i class="fa-solid fa-arrow-up-right-from-square"></i></a>
+          <button type="button" class="close-btn" data-close title="Close (Esc)"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+      </div>
+      <div class="lightbox-viewport" id="lightboxViewport">
+        <div class="lightbox-pan" id="lightboxPan"><img id="lightboxImg" alt="" draggable="false"></div>
+        <div class="lightbox-hint"><i class="fa-solid fa-hand-pointer accent"></i><span>Scroll wheel / +/- to zoom &bull; Drag to pan &bull; Double-click to toggle</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Video modal -->
+  <div class="modal" id="videoModal" hidden>
+    <div class="modal-box video-box">
+      <div class="video-head">
+        <h4 id="videoTitle">Recording</h4>
+        <button type="button" class="close-btn plain" data-close aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="video-frame">
+        <iframe id="videoFrame" title="Video player" allow="autoplay; fullscreen" allowfullscreen></iframe>
+        <div class="video-empty" id="videoEmpty"><i class="fa-solid fa-film"></i><p>Demo recording coming soon.</p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CV modal -->
+  <div class="modal" id="cvModal" hidden>
+    <div class="modal-box cv-box">
+      <button type="button" class="close-btn plain corner" data-close aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+      <div class="card-title-row">
+        <div class="icon-box big"><i class="fa-solid fa-file-invoice"></i></div>
+        <div>
+          <h3 data-content="name">Romelito Briones</h3>
+          <p class="mono-sub" data-content="role">CREATIVE DEVELOPER</p>
+        </div>
+      </div>
+      <p class="muted small">Download the full resume featuring experience, selected projects, and technical proficiencies.</p>
+      <div class="stack-col tight">
+        <a class="btn btn-primary btn-block" id="cvDownload" href="#" download target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-download"></i><span>Download Resume PDF</span></a>
+        <a class="btn btn-outline btn-block" id="cvEmail" href="#" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-envelope accent"></i><span>Request via Email</span></a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Resume by email: enter address, review the ready-made email, send -->
+  <div class="modal" id="resumeRequestModal" hidden>
+    <div class="modal-box cv-box">
+      <button type="button" class="close-btn plain corner" data-close aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+      <div class="card-title-row">
+        <div class="icon-box big"><i class="fa-solid fa-envelope-open-text"></i></div>
+        <div>
+          <h3>Get My Resume</h3>
+          <p class="mono-sub">SENT TO YOUR INBOX</p>
+        </div>
+      </div>
+
+      <form id="resumeEmailStep" class="contact-form">
+        <p class="muted small">Enter your email address and my resume will be sent to you right away.</p>
+        <input type="email" id="resumeEmail" required maxlength="200" pattern="[^@\s]+@[^@\s]+\.[^@\s]+" placeholder="Your Email Address" aria-label="Your email address">
+        <input type="text" class="hp-field" id="resumeWebsite" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <button class="btn btn-primary btn-block" type="submit"><span>Continue</span><i class="fa-solid fa-arrow-right"></i></button>
+      </form>
+
+      <form id="resumeSendStep" class="contact-form" hidden>
+        <div class="email-meta">
+          <span><b>From:</b> <span id="resumeFrom"></span></span>
+          <span><b>To:</b> <span id="resumeTo"></span></span>
+          <span><b>Subject:</b> <span id="resumeSubject"></span></span>
+        </div>
+        <textarea id="resumeMessage" rows="7" maxlength="2000" aria-label="Email message" required></textarea>
+        <p class="form-error" id="resumeError" role="alert" hidden></p>
+        <div class="form-actions">
+          <button class="btn btn-outline" type="button" id="resumeBack"><span>Back</span></button>
+          <button class="btn btn-primary" type="submit" id="resumeSend"><i class="fa-solid fa-paper-plane"></i><span>Send</span></button>
+        </div>
+      </form>
+
+      <div id="resumeDoneStep" class="stack-col tight" hidden>
+        <p class="muted small"><b>Request sent!</b> My resume is on its way to <b id="resumeDoneEmail"></b>. If you don't see it in a few minutes, please check your spam folder.</p>
+        <button class="btn btn-primary btn-block" type="button" data-close><span>Done</span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin: unsaved changes prompt (Save / Discard / Keep editing) -->
+  <div class="modal" id="unsavedModal" hidden>
+    <div class="modal-box unsaved-box">
+      <span class="mono-label"><i class="fa-solid fa-triangle-exclamation"></i> UNSAVED CHANGES</span>
+      <h3>You have unsaved changes in <span id="unsavedTitle">this category</span>.</h3>
+      <p class="muted small">Save them to keep them, or discard to go back to the last saved version.</p>
+      <div class="unsaved-actions">
+        <button type="button" class="btn btn-primary" data-unsaved="save"><i class="fa-solid fa-floppy-disk"></i><span>Save</span></button>
+        <button type="button" class="btn btn-outline" data-unsaved="discard"><i class="fa-solid fa-rotate-left accent"></i><span>Discard</span></button>
+      </div>
+      <button type="button" class="keep-editing" data-unsaved="cancel">Keep editing</button>
+    </div>
+  </div>
+
+  <!-- New niche: choose its starting point -->
+  <div class="modal" id="nicheStartModal" hidden>
+    <div class="modal-box unsaved-box niche-start-box">
+      <span class="mono-label"><i class="fa-solid fa-bullseye"></i> NEW NICHE</span>
+      <h3>How should "<span id="nicheStartName">this niche</span>" start?</h3>
+      <div class="niche-start-options">
+        <button type="button" class="niche-start-opt" data-niche-start="fresh">
+          <i class="fa-solid fa-seedling"></i><strong>Start fresh</strong>
+          <span>Original default content, cards and sections, with the theme you picked. Your logo &amp; brand name are kept. Suggestions open next.</span>
+        </button>
+        <button type="button" class="niche-start-opt" data-niche-start="copy">
+          <i class="fa-solid fa-copy"></i><strong>Copy current setup</strong>
+          <span>Everything as it is now (text, hidden cards, hero, tools, images…) plus the theme you picked.</span>
+        </button>
+      </div>
+      <button type="button" class="keep-editing" data-close>Cancel</button>
+    </div>
+  </div>
+
+  <!-- Admin: edit an image (opened from the "Edit image" button on any managed image) -->
+  <div class="modal" id="imageEditModal" hidden>
+    <div class="modal-box image-edit-box">
+      <button type="button" class="close-btn plain corner" data-close aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+      <span class="mono-label"><i class="fa-solid fa-image"></i> EDIT IMAGE</span>
+      <h3 id="imgEditTitle">Image</h3>
+      <div class="img-edit-preview" id="imgEditPreviewBox"><img id="imgEditPreview" alt="Current image"><span id="imgEditEmpty">Design mockup — no image uploaded yet</span></div>
+      <div class="img-edit-actions">
+        <button type="button" class="btn btn-primary btn-sm" id="imgEditUpload"><i class="fa-solid fa-upload"></i><span>Upload / Replace</span></button>
+        <button type="button" class="btn btn-outline btn-sm" id="imgEditRestoreImg"><i class="fa-solid fa-rotate-left accent"></i><span>Restore Sample Image</span></button>
+        <input type="file" id="imgEditFile" accept="image/png, image/jpeg, image/webp, image/gif" hidden>
+      </div>
+      <label class="img-edit-label"><span class="field-head">Caption / title<button type="button" class="row-reset" id="imgEditRestoreCaption" title="Reset caption"><i class="fa-solid fa-rotate-left"></i></button></span>
+        <input type="text" id="imgEditCaption" maxlength="90" placeholder="Shown at the top of the zoom viewer">
+      </label>
+      <p class="field-hint">Screenshots are resized (max 1600px) and compressed automatically. The page changes only when you click Save.</p>
+      <div class="img-edit-actions">
+        <button type="button" class="btn btn-outline" data-close><span>Close</span></button>
+        <button type="button" class="btn btn-primary" id="imgEditSave"><i class="fa-solid fa-floppy-disk"></i><span>Save</span></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Account login -->
+  <div class="modal" id="accountModal" hidden>
+    <form class="modal-box account-box" id="loginForm">
+      <button type="button" class="close-btn plain corner" data-close aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+      <span class="mono-label"><i class="fa-solid fa-user-shield"></i> ADMIN ACCESS</span>
+      <h2>Admin sign in</h2>
+      <label>Email<input type="email" name="email" value="admin@romel.dev" required></label>
+      <label>Password<input type="password" name="password" required></label>
+      <p class="login-error" id="loginError"></p>
+      <button class="btn btn-primary btn-block" type="submit">Sign in</button>
+    </form>
+  </div>
+
+  <!-- Admin editor -->
+  <aside class="cms-panel" id="cmsPanel" hidden aria-label="Portfolio editor">
+    <div class="cms-head">
+      <div><span class="mono-label">ADMIN EDITOR</span><h2>Portfolio content</h2></div>
+      <button id="closeCms" type="button" class="close-btn plain" aria-label="Close editor"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <label><span class="field-head">Name<button type="button" class="row-reset" data-content-reset="name" title="Reset name to default"><i class="fa-solid fa-rotate-left"></i></button></span><input id="editName"></label>
+    <label><span class="field-head">Role<button type="button" class="row-reset" data-content-reset="role" title="Reset role to default"><i class="fa-solid fa-rotate-left"></i></button></span><input id="editRole"></label>
+    <p class="muted small">The hero headline &amp; description are now in <b>Hero (Top Section)</b> in the sidebar.</p>
+    <label><span class="field-head">Navigation tabs<button type="button" class="row-reset" data-content-reset="tabs" title="Reset navigation tabs to default"><i class="fa-solid fa-rotate-left"></i></button></span><textarea id="editTabs" rows="8"></textarea></label>
+  </aside>
+
+  <!-- Admin: section visibility -->
+  <aside class="cms-panel" id="sectionsPanel" hidden aria-label="Section visibility">
+    <div class="cms-head">
+      <div><span class="mono-label">ADMIN CONTROL</span><h2>Sections</h2></div>
+      <button type="button" class="close-btn plain" data-close-panel aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <p class="muted small">Unchecked sections are hidden from clients and visitors. You still see them, dimmed.</p>
+    <div class="section-toggles" id="sectionToggles"></div>
+    <button type="button" class="btn btn-outline btn-sm btn-block" id="resetSections"><i class="fa-solid fa-rotate-left accent"></i><span>Show All Sections (Default)</span></button>
+  </aside>
+
+  <!-- Admin sidebar (left) -->
+  <aside class="admin-sidebar" id="adminSidebar" hidden aria-label="Admin panel">
+    <div class="sidebar-head">
+      <div class="sidebar-brand">
+        <span class="admin-badge"><i class="fa-solid fa-user-shield"></i><span>ADMIN</span></span>
+        <h2>Site Settings</h2>
+      </div>
+      <button type="button" class="collapse-btn" id="collapseSidebar" aria-label="Collapse admin sidebar" title="Collapse"><i class="fa-solid fa-angles-left"></i></button>
+    </div>
+
+    <nav class="side-nav">
+      <span class="side-label">NICHE</span>
+      <button type="button" data-admin-action="niches" title="Niches"><i class="fa-solid fa-bullseye"></i><span>Niches <b class="niche-current" id="nicheCurrentLabel"></b></span><i class="fa-solid fa-chevron-right go"></i></button>
+    </nav>
+
+    <div class="color-editor tools-editor niche-editor" id="nicheEditor" hidden>
+      <div class="niche-status" id="nicheStatus"></div>
+      <button type="button" class="btn btn-primary btn-sm btn-block" id="saveNiche"><i class="fa-solid fa-floppy-disk"></i><span>Save Niche</span></button>
+
+      <span class="text-row">Your niches</span>
+      <div class="niche-list" id="nicheList"></div>
+
+      <div class="add-card-box" id="newNicheBox">
+        <span class="text-row">Create a niche</span>
+        <input type="text" class="tool-name" id="newNicheName" maxlength="40" placeholder="Niche name, e.g. GHL Automation">
+        <input type="text" class="tool-name" id="newNicheKeywords" maxlength="200" placeholder="Keywords (optional), e.g. crm, workflows, sms">
+        <span class="text-row">Site theme <em class="theme-hint" id="nicheThemeHint"></em></span>
+        <div class="niche-themes" id="newNicheThemes"></div>
+        <button type="button" class="btn btn-primary btn-sm btn-block" id="createNiche"><i class="fa-solid fa-plus"></i><span>Create Niche</span></button>
+      </div>
+
+      <div class="suggest-box" id="suggestBox" hidden>
+        <div class="icon-picker-head">
+          <strong id="suggestTitle">Suggestions</strong>
+          <button type="button" class="close-btn plain" id="closeSuggest" aria-label="Close suggestions"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <p class="field-hint">Checked items will be <b>hidden</b> for this niche. Untick anything you want to keep, then apply. Nothing is final until you click <b>Save Niche</b>.</p>
+        <div class="suggest-list" id="suggestList"></div>
+        <button type="button" class="btn btn-primary btn-sm btn-block" id="applySuggest"><i class="fa-solid fa-check"></i><span>Apply Suggestions</span></button>
+      </div>
+      <button type="button" class="btn btn-outline btn-sm btn-block" id="suggestAgain"><i class="fa-solid fa-wand-magic-sparkles accent"></i><span>Suggest for This Niche</span></button>
+    </div>
+
+    <nav class="side-nav">
+      <span class="side-label">EDIT</span>
+      <button type="button" id="toggleEdit" title="Edit Text"><i class="fa-solid fa-pen"></i><span>Edit Text</span><i class="fa-solid fa-chevron-right go"></i></button>
+      <button type="button" id="openSections" title="Sections"><i class="fa-solid fa-eye"></i><span>Sections</span><i class="fa-solid fa-chevron-right go"></i></button>
+      <button type="button" id="openContent" title="Content"><i class="fa-solid fa-sliders"></i><span>Content</span><i class="fa-solid fa-chevron-right go"></i></button>
+      <span class="side-label">APPEARANCE</span>
+      <button type="button" data-admin-action="colors" class="active" title="Site Theme &amp; Colors"><i class="fa-solid fa-palette"></i><span>Site Theme &amp; Colors</span><i class="fa-solid fa-chevron-down go"></i></button>
+    </nav>
+
+    <div class="color-editor" id="colorEditor">
+      <div class="editor-themes" id="editorThemes"></div>
+      <div class="editor-rows" id="editorRows"></div>
+      <div class="editor-preview" id="editorPreview">
+        <span class="pv-tag">PREVIEW</span>
+        <strong>Heading <em>text</em></strong>
+        <span class="pv-btn">Button</span>
+        <span class="pv-chip">Accent</span>
+      </div>
+      <div class="editor-actions">
+        <button type="button" class="btn btn-primary btn-sm btn-block" id="useEditedTheme"><i class="fa-solid fa-check"></i><span>Set as Site Theme</span></button>
+        <button type="button" class="btn btn-outline btn-sm btn-block" id="restoreThemeColors"><i class="fa-solid fa-rotate-left accent"></i><span>Restore Default Colors</span></button>
+      </div>
+      <p class="editor-note"><i class="fa-solid fa-circle-info"></i> Colors save automatically. Card, border and text shades are calculated from these 4 colors so everything stays readable.</p>
+    </div>
+
+    <nav class="side-nav">
+      <span class="side-label">BRAND</span>
+      <button type="button" data-admin-action="logo" title="Logo &amp; Brand"><i class="fa-solid fa-image"></i><span>Logo &amp; Brand</span><i class="fa-solid fa-chevron-right go"></i></button>
+    </nav>
+
+    <div class="color-editor logo-editor" id="logoEditor" hidden>
+      <div class="brand-fields">
+        <label class="text-row" for="brandNameInput">Brand name</label>
+        <div class="text-field">
+          <input type="text" id="brandNameInput" maxlength="40" spellcheck="false" placeholder="e.g. ROMEL BRIONES">
+          <button type="button" class="row-reset" data-brand-reset="name" title="Reset brand name to default (ROMEL BRIONES)" aria-label="Reset brand name"><i class="fa-solid fa-rotate-left"></i></button>
+        </div>
+        <label class="text-row" for="brandTaglineInput">Tagline</label>
+        <div class="text-field">
+          <input type="text" id="brandTaglineInput" maxlength="50" spellcheck="false" placeholder="e.g. CREATIVE DEVELOPER">
+          <button type="button" class="row-reset" data-brand-reset="tagline" title="Reset tagline to default (CREATIVE DEVELOPER)" aria-label="Reset tagline"><i class="fa-solid fa-rotate-left"></i></button>
+        </div>
+        <p class="field-hint">The whole name is shown in the theme's gradient colors. Name and tagline also set the browser tab title.</p>
+      </div>
+      <div class="logo-drop" id="logoDrop">
+        <div class="logo-preview">
+          <img class="brand-logo" src="romel-logo.svg" alt="Logo preview" draggable="false">
+          <span class="brand-text">
+            <span class="brand-name" data-brand="name"><span class="gradient-text">ROMEL BRIONES</span></span>
+            <small data-brand="tagline">CREATIVE DEVELOPER</small>
+          </span>
+        </div>
+        <p>Drag &amp; drop an image here, or</p>
+        <button type="button" class="btn btn-primary btn-sm" id="uploadLogo"><i class="fa-solid fa-upload"></i><span>Upload Logo</span></button>
+        <input type="file" id="logoFile" accept="image/png, image/jpeg, image/webp, image/svg+xml, image/gif" hidden>
+      </div>
+      <button type="button" class="btn btn-outline btn-sm btn-block" id="removeLogo"><i class="fa-solid fa-rotate-left accent"></i><span>Reset to Default Logo</span></button>
+      <p class="editor-note"><i class="fa-solid fa-circle-info"></i> Uploads are cropped to a circle and a plain background is removed automatically, so the theme colors show behind them. The logo updates in the header, footer and loading screen.</p>
+    </div>
+
+    <nav class="side-nav">
+      <span class="side-label">CONTENT</span>
+      <button type="button" data-admin-action="hero" title="Hero (Top Section)"><i class="fa-solid fa-star"></i><span>Hero (Top Section)</span><i class="fa-solid fa-chevron-right go"></i></button>
+    </nav>
+
+    <div class="color-editor tools-editor hero-editor" id="heroEditor" hidden>
+      <div class="hero-group">
+        <span class="field-head text-row">Headline<button type="button" class="row-reset" data-hero-reset="headline" title="Reset headline"><i class="fa-solid fa-rotate-left"></i></button></span>
+        <textarea class="tool-name svc-desc" id="heroHeadlineInput" rows="2" maxlength="120"></textarea>
+        <span class="field-hint">Write "digital experiences" anywhere in it to show those words in the gradient.</span>
+        <span class="field-head text-row">Description<button type="button" class="row-reset" data-hero-reset="description" title="Reset description"><i class="fa-solid fa-rotate-left"></i></button></span>
+        <textarea class="tool-name svc-desc" id="heroDescInput" rows="3" maxlength="300"></textarea>
+      </div>
+
+      <div class="hero-group">
+        <span class="field-head text-row">Badge<button type="button" class="row-reset" data-hero-reset="badge" title="Reset badge"><i class="fa-solid fa-rotate-left"></i></button></span>
+        <div class="tool-row">
+          <button type="button" class="mini-btn" id="heroBadgeToggle" title="Show / hide badge"><i class="fa-solid fa-eye"></i></button>
+          <input type="text" class="tool-name" id="heroBadgeInput" maxlength="60">
+        </div>
+      </div>
+
+      <div class="hero-group">
+        <span class="field-head text-row">Stat boxes<button type="button" class="row-reset" data-hero-reset="stats" title="Reset stat boxes"><i class="fa-solid fa-rotate-left"></i></button></span>
+        <div class="tool-list" id="heroStats"></div>
+        <button type="button" class="btn btn-outline btn-sm btn-block" id="addHeroStat"><i class="fa-solid fa-plus accent"></i><span>Add Stat</span></button>
+      </div>
+
+      <div class="hero-group">
+        <span class="field-head text-row">Buttons<button type="button" class="row-reset" data-hero-reset="buttons" title="Reset buttons"><i class="fa-solid fa-rotate-left"></i></button></span>
+        <div class="svc-list" id="heroButtons"></div>
+        <div class="picker-mount" id="heroPickerMount"></div>
+        <button type="button" class="btn btn-outline btn-sm btn-block" id="addHeroButton"><i class="fa-solid fa-plus accent"></i><span>Add Button</span></button>
+      </div>
+
+      <div class="hero-group">
+        <span class="field-head text-row">Photo<button type="button" class="row-reset" data-hero-reset="photo" title="Reset photo"><i class="fa-solid fa-rotate-left"></i></button></span>
+        <div class="hero-photo-row">
+          <img id="heroPhotoThumb" alt="Current hero photo">
+          <div class="hero-photo-actions">
+            <button type="button" class="btn btn-primary btn-sm" id="uploadHeroPhoto"><i class="fa-solid fa-upload"></i><span>Upload Photo</span></button>
+            <button type="button" class="btn btn-outline btn-sm" id="heroPhotoToggle"><i class="fa-solid fa-eye accent"></i><span>Hide Photo</span></button>
+          </div>
+          <input type="file" id="heroPhotoFile" accept="image/png, image/jpeg, image/webp" hidden>
+        </div>
+      </div>
+    </div>
+
+    <nav class="side-nav">
+      <button type="button" data-admin-action="resume" title="My Resume"><i class="fa-solid fa-file-lines"></i><span>My Resume</span><i class="fa-solid fa-chevron-right go"></i></button>
+    </nav>
+
+    <div class="color-editor logo-editor" id="resumeEditor" hidden>
+      <div class="logo-drop" id="resumeDrop">
+        <p class="resume-file" id="resumeFileName">No resume uploaded yet</p>
+        <p>Drag &amp; drop a PDF or Word file here, or</p>
+        <button type="button" class="btn btn-primary btn-sm" id="uploadResume"><i class="fa-solid fa-upload"></i><span>Upload Resume</span></button>
+        <input type="file" id="resumeFile" accept=".pdf,.doc,.docx" hidden>
+      </div>
+      <a class="btn btn-outline btn-sm btn-block" id="previewResume" href="#" target="_blank" rel="noopener noreferrer" hidden><i class="fa-solid fa-eye accent"></i><span>Preview Resume</span></a>
+      <button type="button" class="btn btn-outline btn-sm btn-block" id="removeResume"><i class="fa-solid fa-trash accent"></i><span>Remove Resume</span></button>
+      <p class="editor-note"><i class="fa-solid fa-circle-info"></i> Each niche keeps its own resume. Clients enter their email and this file is sent to them automatically. Click <b>Save changes</b>, then <b>Save Niche</b> to publish it.</p>
+    </div>
+
+    <nav class="side-nav">
+      <button type="button" data-admin-action="tools" title="Tools &amp; Technologies"><i class="fa-solid fa-microchip"></i><span>Tools &amp; Technologies</span><i class="fa-solid fa-chevron-right go"></i></button>
+    </nav>
+
+    <div class="color-editor tools-editor" id="toolsEditor" hidden>
+      <p class="field-hint">Click an icon to change it, edit the name, or remove a tool. Changes show instantly in the scrolling strip.</p>
+      <div class="tool-list" id="toolList"></div>
+      <div class="picker-mount" id="toolsPickerMount"></div>
+      <button type="button" class="btn btn-primary btn-sm btn-block" id="addTool"><i class="fa-solid fa-plus"></i><span>Add Tool</span></button>
+      <button type="button" class="btn btn-outline btn-sm btn-block" id="resetTools"><i class="fa-solid fa-rotate-left accent"></i><span>Reset to Default Tools</span></button>
+    </div>
+
+    <nav class="side-nav">
+      <button type="button" data-admin-action="focus" title="Current Focus"><i class="fa-solid fa-briefcase"></i><span>Current Focus</span><i class="fa-solid fa-chevron-right go"></i></button>
+    </nav>
+
+    <div class="color-editor tools-editor" id="focusEditor" hidden>
+      <span class="text-row">Card icon</span>
+      <div class="focus-icon-row">
+        <button type="button" class="tool-icon" id="focusIconBtn" title="Change icon"><i class="fa-solid fa-briefcase"></i></button>
+        <span class="field-hint">Click the icon to change it</span>
+      </div>
+      <div class="picker-mount" id="focusPickerMount"></div>
+      <span class="text-row">Bullet points</span>
+      <div class="tool-list" id="focusBullets"></div>
+      <button type="button" class="btn btn-primary btn-sm btn-block" id="addBullet"><i class="fa-solid fa-plus"></i><span>Add Bullet</span></button>
+      <button type="button" class="btn btn-outline btn-sm btn-block" id="resetFocus"><i class="fa-solid fa-rotate-left accent"></i><span>Reset to Default</span></button>
+    </div>
+
+    <nav class="side-nav">
+      <button type="button" data-admin-action="services" title="Services (What I can do)"><i class="fa-solid fa-layer-group"></i><span>Services (What I can do)</span><i class="fa-solid fa-chevron-right go"></i></button>
+    </nav>
+
+    <div class="color-editor tools-editor" id="servicesEditor" hidden>
+      <p class="field-hint">Edit each card's icon, title, description and bottom link. Changes show instantly.</p>
+      <div class="svc-list" id="svcList"></div>
+      <div class="picker-mount" id="svcPickerMount"></div>
+      <button type="button" class="btn btn-primary btn-sm btn-block" id="addService"><i class="fa-solid fa-plus"></i><span>Add Card</span></button>
+      <button type="button" class="btn btn-outline btn-sm btn-block" id="resetServices"><i class="fa-solid fa-rotate-left accent"></i><span>Reset to Default Cards</span></button>
+    </div>
+
+    <nav class="side-nav">
+      <button type="button" data-admin-action="cards" title="Page Cards"><i class="fa-solid fa-table-cells-large"></i><span>Page Cards</span><i class="fa-solid fa-chevron-right go"></i></button>
+    </nav>
+
+    <div class="color-editor tools-editor" id="cardsEditor" hidden>
+      <p class="field-hint">Show / hide, reorder and move cards between columns, or add your own. Hidden cards are invisible to clients and visitors.</p>
+      <label class="text-row" for="cardSection">Section</label>
+      <select id="cardSection" class="tool-name"></select>
+      <div class="card-mgr-list" id="cardList"></div>
+      <div class="picker-mount" id="cardPickerMount"></div>
+      <div class="add-card-box">
+        <span class="text-row">Add a new card</span>
+        <div class="svc-link">
+          <select id="newCardType" class="tool-name" title="Card type">
+            <option value="quote">Quote card</option>
+            <option value="text">Text card</option>
+            <option value="list">List card</option>
+            <option value="tags">Tags card</option>
+          </select>
+          <select id="newCardZone" class="tool-name" title="Where to add it"></select>
+        </div>
+        <button type="button" class="btn btn-primary btn-sm btn-block" id="addCard"><i class="fa-solid fa-plus"></i><span>Add Card</span></button>
+      </div>
+      <button type="button" class="btn btn-outline btn-sm btn-block" id="resetCardLayout"><i class="fa-solid fa-rotate-left accent"></i><span>Restore Default Layout</span></button>
+    </div>
+
+    <!-- Shared icon list; moved into whichever editor opens it -->
+    <div class="icon-picker" id="iconPicker" hidden>
+      <div class="icon-picker-head">
+        <strong id="iconPickerTitle">Choose an icon</strong>
+        <button type="button" class="close-btn plain" id="closeIconPicker" aria-label="Close icon list"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <input type="search" id="iconSearch" placeholder="Search icons (e.g. shop, chat, cloud)" spellcheck="false">
+      <div class="icon-grid" id="iconGrid"></div>
+    </div>
+
+    <div class="side-foot">
+      <button type="button" data-role="signout" title="Sign out"><i class="fa-solid fa-right-from-bracket"></i><span>Sign out</span></button>
+    </div>
+  </aside>
+
+  <!-- Opens the admin sidebar on phones / tablets -->
+  <button type="button" class="admin-fab" id="adminFab" hidden aria-label="Open site settings"><i class="fa-solid fa-sliders"></i></button>
+
+  <!-- Client indicator -->
+  <div class="client-badge" id="clientBadge" hidden>
+    <i class="fa-solid fa-eye"></i><span>Client view &bull; read only</span>
+    <button type="button" data-role="signout" aria-label="Exit client view"><i class="fa-solid fa-xmark"></i></button>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>

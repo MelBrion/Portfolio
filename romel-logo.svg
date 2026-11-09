@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">Romelito Briones professional monogram</title>
+  <desc id="desc">A clean dark R monogram with a precise cyan accent</desc>
+  <defs>
+    <linearGradient id="panel" x1="8" y1="6" x2="56" y2="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#182638"/><stop offset="1" stop-color="#080d17"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="10" y1="54" x2="54" y2="10" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#c6a84e"/><stop offset="1" stop-color="#5ed6ec"/>
+    </linearGradient>
+  </defs>
+  <rect x="5" y="5" width="54" height="54" rx="17" fill="url(#panel)" stroke="url(#accent)" stroke-width="1.4"/>
+  <path d="M22 47V17h14.2c7.1 0 11.3 3.7 11.3 9.7 0 4.4-2.4 7.5-6.5 8.9L49 47h-7.3l-7.1-10.1h-6V47H22zm6.6-16.4h7c3.4 0 5.3-1.4 5.3-3.9 0-2.6-1.9-4-5.3-4h-7v7.9z" fill="#f4f8fb"/>
+  <path d="M44.5 46.8l4.2 0" fill="none" stroke="#55cfe3" stroke-width="2.8" stroke-linecap="round"/>
+</svg>
