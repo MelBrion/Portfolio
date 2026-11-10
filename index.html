@@ -16,7 +16,7 @@
         var N = window.ROMEL_NICHES, ls = localStorage;
         if (!N || !N.niches) return;
         // V2 text edits are still accepted from older saved niches; the page upgrades them to V3 on load
-        var KEYS = ['romelPageEditsV3', 'romelPageEditsV2', 'romelHiddenSections', 'romelPortfolioContent', 'romelTheme', 'romelThemeColors', 'romelThemeCache', 'romelLogo', 'romelBrand', 'romelTools', 'romelFocus', 'romelServices', 'romelCards', 'romelHero', 'romelImages', 'romelResume'];
+        var KEYS = ['romelPageEditsV3', 'romelPageEditsV2', 'romelHiddenSections', 'romelPortfolioContent', 'romelTheme', 'romelThemeColors', 'romelThemeCache', 'romelLogo', 'romelBrand', 'romelTools', 'romelFocus', 'romelServices', 'romelCards', 'romelHero', 'romelImages', 'romelResume', 'romelSectionOrder', 'romelCustomSections', 'romelHiddenContent'];
         var asked = new URLSearchParams(location.search).get('niche'), active = ls.getItem('romelActiveNiche');
         var pending = JSON.parse(ls.getItem('romelPendingNiche') || 'null');
         if (!asked && pending && pending.slug === active) return; // a new niche being set up, not saved yet
@@ -264,7 +264,7 @@
           <p>From first sketch to final launch, I bring strategy, craft, and technology together.</p>
         </div>
 
-        <div class="card-grid cols-4" id="servicesGrid">
+        <div class="card-grid cols-4 flex-cards" id="servicesGrid">
           <article class="card pad-md service reveal">
             <div>
               <div class="icon-box"><i class="fa-solid fa-code"></i></div>
@@ -308,7 +308,6 @@
                 <p class="mono-sub">Tools I design, build &amp; automate with</p>
               </div>
             </div>
-            <button class="btn btn-primary btn-sm" type="button" data-open="cvModal"><i class="fa-solid fa-file-pdf"></i><span>My Resume</span></button>
           </div>
           <div class="stack-groups">
             <div class="stack-group" style="--tone:var(--accent)">
@@ -745,6 +744,19 @@
     </div>
   </div>
 
+  <!-- Admin: shared yes / no confirmation (menu order, deleting added content) -->
+  <div class="modal" id="confirmModal" hidden>
+    <div class="modal-box unsaved-box">
+      <span class="mono-label" id="confirmLabel"></span>
+      <h3 id="confirmTitle"></h3>
+      <div id="confirmBody"></div>
+      <div class="unsaved-actions">
+        <button type="button" class="btn btn-primary" data-confirm="yes" id="confirmYes"><i class="fa-solid fa-check"></i><span>Confirm</span></button>
+        <button type="button" class="btn btn-outline" data-confirm="no" id="confirmNo"><i class="fa-solid fa-rotate-left accent"></i><span>Cancel</span></button>
+      </div>
+    </div>
+  </div>
+
   <!-- New niche: choose its starting point -->
   <div class="modal" id="nicheStartModal" hidden>
     <div class="modal-box unsaved-box niche-start-box">
@@ -818,9 +830,11 @@
       <div><span class="mono-label">ADMIN CONTROL</span><h2>Sections</h2></div>
       <button type="button" class="close-btn plain" data-close-panel aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
     </div>
-    <p class="muted small">Unchecked sections are hidden from clients and visitors. You still see them, dimmed.</p>
+    <p class="muted small">Drag a section (or use the arrows) to change its place on the page. The eye hides it from the page completely (the rest moves up to fill the space) — click it again to bring it back. Hero always stays at the top.</p>
     <div class="section-toggles" id="sectionToggles"></div>
-    <button type="button" class="btn btn-outline btn-sm btn-block" id="resetSections"><i class="fa-solid fa-rotate-left accent"></i><span>Show All Sections (Default)</span></button>
+    <p class="field-hint">To add a new section, use <b>+ Add Content</b> at the bottom of the CONTENT menu in the sidebar.</p>
+    <input type="file" id="secImageFile" accept="image/*" hidden>
+    <button type="button" class="btn btn-outline btn-sm btn-block" id="resetSections"><i class="fa-solid fa-rotate-left accent"></i><span>Default Order &amp; Show All</span></button>
   </aside>
 
   <!-- Admin sidebar (left) -->
@@ -1024,7 +1038,7 @@
     </nav>
 
     <div class="color-editor tools-editor" id="servicesEditor" hidden>
-      <p class="field-hint">Edit each card's icon, title, description and bottom link. Changes show instantly.</p>
+      <p class="field-hint">Edit each card's icon, title, description and bottom link. Use the eye to hide a card without deleting it, or Add Card for a new one.</p>
       <div class="svc-list" id="svcList"></div>
       <div class="picker-mount" id="svcPickerMount"></div>
       <button type="button" class="btn btn-primary btn-sm btn-block" id="addService"><i class="fa-solid fa-plus"></i><span>Add Card</span></button>
@@ -1055,6 +1069,19 @@
         <button type="button" class="btn btn-primary btn-sm btn-block" id="addCard"><i class="fa-solid fa-plus"></i><span>Add Card</span></button>
       </div>
       <button type="button" class="btn btn-outline btn-sm btn-block" id="resetCardLayout"><i class="fa-solid fa-rotate-left accent"></i><span>Restore Default Layout</span></button>
+    </div>
+
+    <!-- Added content: each new section gets its own menu item (built in script.js) placed above this button -->
+    <nav class="side-nav add-content-nav" id="addContentNav">
+      <button type="button" id="addContentBtn" data-admin-action="addContent" title="Add Content"><i class="fa-solid fa-plus"></i><span>Add Content</span><i class="fa-solid fa-chevron-right go"></i></button>
+    </nav>
+    <div class="color-editor tools-editor" id="addContentBox" hidden>
+      <p class="field-hint">Choose what the new section shows. It gets its own item in this menu, and is added to the page just above Contact once you click Save changes.</p>
+      <div class="sec-add">
+        <button type="button" class="btn btn-outline btn-sm" data-add-content="text"><i class="fa-solid fa-align-left accent"></i><span>Text</span></button>
+        <button type="button" class="btn btn-outline btn-sm" data-add-content="cards"><i class="fa-solid fa-table-cells-large accent"></i><span>Cards</span></button>
+        <button type="button" class="btn btn-outline btn-sm" data-add-content="image"><i class="fa-solid fa-image accent"></i><span>Image</span></button>
+      </div>
     </div>
 
     <!-- Shared icon list; moved into whichever editor opens it -->

@@ -69,7 +69,12 @@ function applyContent() {
   $$('[data-content="role"]').forEach(el => el.textContent = content.role);
   $('#heroHeadline').innerHTML = escapeHtml(content.headline).replace('digital experiences', '<span class="gradient-text">digital experiences</span>');
   $('#heroDescription').textContent = content.description;
-  $$('.portfolio-tabs').forEach(nav => $$('a', nav).forEach((link, i) => { if (content.tabs[i]) link.textContent = content.tabs[i]; }));
+  // Each built-in tab remembers its original position, so renaming still works after sections are reordered
+  $$('.portfolio-tabs').forEach(nav => $$('a:not([data-custom])', nav).forEach((link, i) => {
+    if (link.dataset.tab == null) link.dataset.tab = i;
+    const label = content.tabs[Number(link.dataset.tab)];
+    if (label) link.textContent = label;
+  }));
 }
 applyContent();
 
@@ -423,6 +428,8 @@ function closeModal(modal, force = false) {
   }
   // Closing the unsaved prompt any other way counts as "Keep editing"
   if (modal.id === 'unsavedModal' && window.__unsavedResolve) { window.__unsavedResolve('cancel'); window.__unsavedResolve = null; }
+  // Closing the yes / no prompt any other way (Esc, clicking outside) counts as "no"
+  if (modal.id === 'confirmModal' && window.__confirmResolve) { window.__confirmResolve(false); window.__confirmResolve = null; }
   modal.hidden = true;
   if (modal.id === 'videoModal') $('#videoFrame').src = 'about:blank';
   if (modal.id === 'lightboxModal') { $('#lightboxImg').src = ''; lb.zoom = 1; lb.x = lb.y = 0; }
@@ -884,15 +891,26 @@ const safeLink = link => linkTargets().some(([href]) => href && href === link) ?
 
 function renderServices() {
   const grid = $('#servicesGrid');
-  grid.innerHTML = servicesSaved.map(s => {
+  grid.innerHTML = servicesSaved.map((s, i) => {
+    if (s.hidden) return '';
     const link = safeLink(s.link);
     const foot = link && s.linkText.trim()
       ? `<div class="card-foot"><a class="nav-link link-${['accent', 'biloba', 'mint'].includes(s.style) ? s.style : 'accent'}" href="${link}">${escapeHtml(s.linkText)} &rarr;</a></div>` : '';
-    return `<article class="card pad-md service reveal"><div><div class="icon-box"><i class="${s.icon}"></i></div>`
+    return `<article class="card pad-md service reveal" data-svc-i="${i}"><div><div class="icon-box"><i class="${s.icon}"></i></div>`
       + `<h3>${escapeHtml(s.title)}</h3><p>${escapeHtml(s.desc)}</p></div>${foot}</article>`;
   }).join('');
   $$('.reveal', grid).forEach(el => revealer.observe(el));
+  layoutServiceGrid();
 }
+// Pick a column count that fits the visible cards evenly (a short last row is centered by CSS)
+function layoutServiceGrid() {
+  const grid = $('#servicesGrid');
+  // Admins still see page-editor-hidden cards (faded), so only visitors skip them
+  const admin = document.body.classList.contains('role-admin');
+  const n = [...grid.children].filter(el => admin || !el.classList.contains('card-hidden')).length;
+  grid.style.setProperty('--cols', gridCols(n));
+}
+function gridCols(n) { return n <= 2 ? 2 : [3, 5, 6, 9].includes(n) ? 3 : 4; }
 function saveServices() {
   $('#resetServices').disabled = sameJSON(services, DEFAULT_SERVICES);
   markDirty();
@@ -911,8 +929,9 @@ function discardServices() {
 function renderServiceEditor() {
   const targets = linkTargets();
   $('#svcList').innerHTML = services.map((s, i) =>
-    `<div class="svc-item${i === svcPicking ? ' picking' : ''}">`
-    + `<div class="svc-head"><button type="button" class="tool-icon" data-svc-icon="${i}" style="--tone:${iconTone(s.icon)}" title="Change icon"><i class="${s.icon}"></i></button>`
+    `<div class="svc-item${i === svcPicking ? ' picking' : ''}${s.hidden ? ' is-off' : ''}">`
+    + `<div class="svc-head"><button type="button" class="mini-btn" data-svc-toggle="${i}" title="${s.hidden ? 'Show this card' : 'Hide this card'}">${eyeIcon(!s.hidden)}</button>`
+    + `<button type="button" class="tool-icon" data-svc-icon="${i}" style="--tone:${iconTone(s.icon)}" title="Change icon"><i class="${s.icon}"></i></button>`
     + `<input type="text" class="tool-name" data-svc-field="title" data-i="${i}" value="${escapeHtml(s.title)}" maxlength="40" placeholder="Card title">`
     + `<button type="button" class="tool-remove" data-remove-svc="${i}" title="Remove this card" aria-label="Remove card"><i class="fa-solid fa-xmark"></i></button></div>`
     + `<textarea class="tool-name svc-desc" data-svc-field="desc" data-i="${i}" rows="3" maxlength="200" placeholder="Short description">${escapeHtml(s.desc)}</textarea>`
@@ -928,7 +947,14 @@ $('#svcList').addEventListener('input', e => {
   saveServices();
 });
 $('#svcList').addEventListener('click', e => {
-  const pick = e.target.closest('[data-svc-icon]'), remove = e.target.closest('[data-remove-svc]');
+  const pick = e.target.closest('[data-svc-icon]'), remove = e.target.closest('[data-remove-svc]'), toggle = e.target.closest('[data-svc-toggle]');
+  if (toggle) {
+    const s = services[Number(toggle.dataset.svcToggle)];
+    if (s.hidden) delete s.hidden; else s.hidden = true;
+    saveServices();
+    renderServiceEditor();
+    return;
+  }
   if (pick) {
     const i = Number(pick.dataset.svcIcon);
     hideIconPicker();
@@ -1514,6 +1540,17 @@ const store = {
 const cmsPanel = $('#cmsPanel'), sectionsPanel = $('#sectionsPanel');
 let role = sessionStorage.getItem('romelRole') || 'guest';
 let hiddenSections = store.get('romelHiddenSections', []);
+// Content hidden with the eye in the sidebar CONTENT menu (tools / focus / services / cards)
+let hiddenContent = store.get('romelHiddenContent', []);
+// What each eye hides on the page. Page Cards hides every built-in section it manages (all but Hero).
+const CONTENT_TARGETS = {
+  tools: () => [$('#marqueeTrack').closest('.card')],
+  focus: () => [$('#focusList').closest('.card')],
+  services: () => [$('#services .section-head'), $('#servicesGrid')]
+};
+function applyContentVisibility() {
+  Object.entries(CONTENT_TARGETS).forEach(([key, els]) => els().forEach(el => el && el.classList.toggle('content-hidden', hiddenContent.includes(key))));
+}
 
 // Every text element the admin can edit in place. Name / role / hero text are edited from the Content panel,
 // and the Current Focus bullets + service cards from their own sidebar editors, so those are skipped here.
@@ -1630,50 +1667,237 @@ document.addEventListener('click', e => {
 
 // Sections whose cards are all hidden (filled in by Page Cards) are dropped for clients like hidden sections
 let autoEmptySections = new Set();
-const hiddenForClients = id => hiddenSections.includes(id) || autoEmptySections.has(id);
+const hiddenByCardsEye = id => hiddenContent.includes('cards') && BUILTIN_SECTIONS.includes(id);
+const hiddenForClients = id => hiddenSections.includes(id) || hiddenByCardsEye(id) || autoEmptySections.has(id);
 function applyVisibility() {
+  applyContentVisibility();
   $$('main section[id]').forEach(section => {
-    section.classList.toggle('is-hidden', hiddenSections.includes(section.id));
+    // Sections hidden on purpose (eye / Sections panel) are removed for everyone, admin included, so the page closes up.
+    // Sections that are only empty of cards stay visible (dimmed) for the admin so cards can be added back.
+    const removed = hiddenSections.includes(section.id) || hiddenByCardsEye(section.id);
+    section.classList.toggle('is-hidden', removed);
     section.classList.toggle('auto-empty', autoEmptySections.has(section.id));
-    section.hidden = hiddenForClients(section.id) && role !== 'admin';
+    section.hidden = removed || (hiddenForClients(section.id) && role !== 'admin');
   });
-  $$('.portfolio-tabs a').forEach(link => link.hidden = role !== 'admin' && hiddenForClients(link.getAttribute('href').slice(1)));
+  $$('.portfolio-tabs a').forEach(link => {
+    const id = link.getAttribute('href').slice(1);
+    link.hidden = hiddenSections.includes(id) || hiddenByCardsEye(id) || (role !== 'admin' && hiddenForClients(id));
+  });
   syncWorkflowFilters();
 }
-// The Sections panel edits sectionsDraft; hiddenSections (what the page uses) changes on Save
+/* ==========================================================================
+   SECTIONS (sidebar → Sections): order (Hero always first), show / hide,
+   and sections the admin adds (Text, Cards or Image)
+   ========================================================================== */
+const mainEl = $('main');
+const BUILTIN_SECTIONS = $$('main > section[id]').map(s => s.id).filter(id => id !== 'hero');
+const CUSTOM_TYPES = { text: 'Text', cards: 'Cards', image: 'Image' };
+// Default order: the built-in sections, then added sections, with Contact kept last
+const defaultOrder = customs => {
+  const ids = customs.map(c => c.id);
+  return BUILTIN_SECTIONS.includes('contact')
+    ? [...BUILTIN_SECTIONS.filter(id => id !== 'contact'), ...ids, 'contact'] : [...BUILTIN_SECTIONS, ...ids];
+};
+// Drops unknown ids and slots any missing section back in at its default spot
+function normalizeOrder(order, customs) {
+  const all = defaultOrder(customs);
+  const out = (Array.isArray(order) ? order : []).filter((id, i, a) => all.includes(id) && a.indexOf(id) === i);
+  all.forEach((id, i) => {
+    if (out.includes(id)) return;
+    const next = all.slice(i + 1).find(n => out.includes(n));
+    next ? out.splice(out.indexOf(next), 0, id) : out.push(id);
+  });
+  return out;
+}
+let customSections = store.get('romelCustomSections', []);
+let sectionOrder = normalizeOrder(store.get('romelSectionOrder', null), customSections);
+
+function customSectionHTML(c) {
+  const head = '<div class="section-head reveal">'
+    + (c.tag.trim() ? `<div class="section-tag"><i class="${escapeHtml(c.icon)}"></i> ${escapeHtml(c.tag)}</div>` : '')
+    + (c.title.trim() ? `<h2>${escapeHtml(c.title)}</h2>` : '')
+    + (c.intro.trim() ? `<p>${escapeHtml(c.intro)}</p>` : '') + '</div>';
+  let body = '';
+  if (c.type === 'text' && c.text.trim())
+    body = `<div class="custom-text reveal">${c.text.trim().split(/\n\s*\n/).map(p => `<p>${escapeHtml(p.trim()).replace(/\n/g, '<br>')}</p>`).join('')}</div>`;
+  if (c.type === 'cards' && c.cards.length)
+    body = `<div class="card-grid flex-cards" style="--cols:${gridCols(c.cards.length)}">${c.cards.map(k =>
+      `<article class="card pad-md service reveal"><div><div class="icon-box"><i class="${escapeHtml(k.icon)}"></i></div><h3>${escapeHtml(k.title)}</h3><p>${escapeHtml(k.text)}</p></div></article>`).join('')}</div>`;
+  if (c.type === 'image')
+    body = c.image ? `<figure class="custom-figure reveal"><img src="${c.image}" alt="${escapeHtml(c.caption || c.title)}">${c.caption.trim() ? `<figcaption>${escapeHtml(c.caption)}</figcaption>` : ''}</figure>`
+      : '<p class="custom-empty">No image yet — upload one in Sections.</p>';
+  return `<div class="container">${head}${body}</div>`;
+}
+// Builds the added sections, puts every section in the saved order, and makes the menu tabs follow
+function renderSections() {
+  $$('main > section.custom-section').forEach(s => { if (!customSections.some(c => c.id === s.id)) s.remove(); });
+  customSections.forEach(c => {
+    let s = document.getElementById(c.id);
+    if (!s) {
+      s = document.createElement('section');
+      s.className = 'section custom-section';
+      s.id = c.id;
+      mainEl.appendChild(s);
+      spy.observe(s);
+    }
+    s.innerHTML = customSectionHTML(c);
+    $$('.reveal', s).forEach(el => revealer.observe(el));
+  });
+  sectionOrder.forEach(id => { const s = document.getElementById(id); if (s) mainEl.appendChild(s); });
+  $$('.portfolio-tabs').forEach(nav => {
+    $$('a[data-custom]', nav).forEach(a => a.remove());
+    sectionOrder.forEach(id => {
+      const c = customSections.find(x => x.id === id);
+      let link = c ? null : $(`a[href="#${id}"]`, nav);
+      if (c && c.nav.trim()) {
+        link = document.createElement('a');
+        link.href = '#' + id;
+        link.className = nav.id === 'navLinks' ? 'nav-link nav-btn' : 'nav-link';
+        link.dataset.custom = '';
+        link.textContent = c.nav.trim();
+      }
+      if (link) nav.appendChild(link);
+    });
+  });
+  applyVisibility();
+}
+renderSections();
+
+// The Sections panel edits order + visibility; the page changes on Save.
+// What an added section contains is edited from its own item in the sidebar CONTENT menu (see ADDED CONTENT).
 let sectionsDraft = [...hiddenSections];
+let orderDraft = [...sectionOrder];
+let dragSection = null;
+const pickerInPanel = () => sectionsPanel.contains($('#iconPicker'));
+
+function sectionInfo(id) {
+  const c = customSections.find(x => x.id === id);
+  if (c) return { c, name: c.title.trim() || c.nav.trim() || 'Untitled section', sub: `Added section · ${CUSTOM_TYPES[c.type]}` };
+  const s = document.getElementById(id);
+  const label = $(`.desktop-nav a[href="#${id}"]:not([data-custom])`) || $('.section-tag', s) || $('h2', s);
+  const h2 = $('h2', s);
+  return { name: label ? label.textContent.trim() : id, sub: h2 && h2 !== label ? h2.textContent.trim() : '' };
+}
+function customEditorHTML(c) {
+  const inp = (key, max, ph) => `<input type="text" class="tool-name" data-cs-field="${key}" value="${escapeHtml(c[key])}" maxlength="${max}" placeholder="${ph}">`;
+  const area = (key, rows, max, ph) => `<textarea class="tool-name svc-desc" data-cs-field="${key}" rows="${rows}" maxlength="${max}" placeholder="${ph}">${escapeHtml(c[key])}</textarea>`;
+  const field = (label, html) => `<label class="sec-field"><span>${label}</span>${html}</label>`;
+  let html = `<div class="cs-form" data-cs="${c.id}">`
+    + `<div class="sec-field"><span>Small label</span><div class="svc-head"><button type="button" class="tool-icon" data-cs-icon style="--tone:${iconTone(c.icon)}" title="Change label icon"><i class="${escapeHtml(c.icon)}"></i></button>${inp('tag', 40, 'e.g. Certificates')}</div></div>`
+    + field('Title', inp('title', 80, 'Section title'))
+    + field('Intro line', area('intro', 2, 300, 'Short sentence under the title (optional)'))
+    + field('Menu tab (optional)', inp('nav', 24, 'Leave empty for no tab in the top menu'));
+  if (c.type === 'text') html += field('Text', area('text', 6, 3000, 'Write your text. Leave a blank line between paragraphs.'));
+  if (c.type === 'image') html += `<div class="sec-field"><span>Image</span>${c.image ? `<img class="sec-thumb" src="${c.image}" alt="">` : ''}`
+    + `<button type="button" class="btn btn-outline btn-sm btn-block" data-cs-upload><i class="fa-solid fa-upload accent"></i><span>${c.image ? 'Replace Image' : 'Upload Image'}</span></button></div>`
+    + field('Caption (optional)', inp('caption', 150, 'Text under the image'));
+  if (c.type === 'cards') html += '<div class="sec-field"><span>Cards</span></div>' + c.cards.map((k, i) =>
+    `<div class="svc-item"><div class="svc-head"><button type="button" class="tool-icon" data-cs-card-icon="${i}" style="--tone:${iconTone(k.icon)}" title="Change icon"><i class="${escapeHtml(k.icon)}"></i></button>`
+    + `<input type="text" class="tool-name" data-cs-card="title" data-i="${i}" value="${escapeHtml(k.title)}" maxlength="40" placeholder="Card title">`
+    + `<button type="button" class="tool-remove" data-cs-card-remove="${i}" title="Remove this card" aria-label="Remove card"><i class="fa-solid fa-xmark"></i></button></div>`
+    + `<textarea class="tool-name svc-desc" data-cs-card="text" data-i="${i}" rows="3" maxlength="200" placeholder="Short description">${escapeHtml(k.text)}</textarea></div>`).join('')
+    + '<button type="button" class="btn btn-outline btn-sm btn-block" data-cs-card-add><i class="fa-solid fa-plus accent"></i><span>Add Card</span></button>';
+  return html + '</div>';
+}
 function buildSectionToggles() {
-  $('#sectionToggles').innerHTML = $$('main section[id]').filter(s => s.id !== 'hero').map(section => {
-    const name = ($(`.desktop-nav a[href="#${section.id}"]`) || $('h2', section)).textContent.trim();
-    return `<label class="toggle-row"><span>${escapeHtml(name)}</span><input type="checkbox" data-section="${section.id}" ${sectionsDraft.includes(section.id) ? '' : 'checked'}><i class="switch"></i></label>`;
+  const rows = orderDraft.map((id, i) => {
+    const info = sectionInfo(id), shown = !sectionsDraft.includes(id);
+    return `<div class="sec-row${shown ? '' : ' is-off'}" draggable="true" data-sec="${id}">`
+      + '<span class="sec-grip" title="Drag to move"><i class="fa-solid fa-grip-vertical"></i></span>'
+      + `<span class="sec-name"><b>${escapeHtml(info.name)}</b>${info.sub ? `<small>${escapeHtml(info.sub)}</small>` : ''}</span>`
+      + `<button type="button" class="mini-btn" data-sec-move="-1"${i === 0 ? ' disabled' : ''} title="Move up" aria-label="Move up"><i class="fa-solid fa-arrow-up"></i></button>`
+      + `<button type="button" class="mini-btn" data-sec-move="1"${i === orderDraft.length - 1 ? ' disabled' : ''} title="Move down" aria-label="Move down"><i class="fa-solid fa-arrow-down"></i></button>`
+      + (info.c ? '<button type="button" class="mini-btn" data-sec-open title="Edit this content in the sidebar" aria-label="Edit"><i class="fa-solid fa-pen"></i></button>' : '')
+      + `<button type="button" class="mini-btn" data-sec-toggle title="${shown ? 'Hide' : 'Show'} this section" aria-label="${shown ? 'Hide' : 'Show'}">${eyeIcon(shown)}</button>`
+      + '</div>';
   }).join('');
-  $('#resetSections').disabled = !sectionsDraft.length;
+  $('#sectionToggles').innerHTML = '<div class="sec-row locked"><span class="sec-grip"><i class="fa-solid fa-lock"></i></span><span class="sec-name"><b>Hero (Top Section)</b><small>Always stays at the top</small></span></div>' + rows;
+  $('#resetSections').disabled = !sectionsDraft.length && sameJSON(orderDraft, defaultOrder(customSections));
   markDirty();
 }
-$('#sectionToggles').addEventListener('change', e => {
-  const id = e.target.dataset.section;
-  sectionsDraft = e.target.checked ? sectionsDraft.filter(s => s !== id) : [...new Set([...sectionsDraft, id])];
-  $('#resetSections').disabled = !sectionsDraft.length;
-  markDirty();
+$('#sectionToggles').addEventListener('click', e => {
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  const row = btn.closest('.sec-row'), id = row && row.dataset.sec;
+  if (btn.dataset.secMove) {
+    const i = orderDraft.indexOf(id), j = i + Number(btn.dataset.secMove);
+    [orderDraft[i], orderDraft[j]] = [orderDraft[j], orderDraft[i]];
+  } else if (btn.matches('[data-sec-toggle]')) {
+    sectionsDraft = sectionsDraft.includes(id) ? sectionsDraft.filter(s => s !== id) : [...sectionsDraft, id];
+  } else if (btn.matches('[data-sec-open]')) {
+    return openSidebarSection(id);
+  } else return;
+  buildSectionToggles();
+});
+// Drag a row to a new place (the arrows do the same on touch screens)
+$('#sectionToggles').addEventListener('dragstart', e => {
+  const row = e.target.closest && e.target.closest('.sec-row[data-sec]');
+  if (!row) return e.preventDefault();
+  dragSection = row.dataset.sec;
+  row.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', dragSection);
+});
+$('#sectionToggles').addEventListener('dragover', e => {
+  const row = e.target.closest('.sec-row[data-sec]');
+  if (!dragSection || !row) return;
+  e.preventDefault();
+  const after = e.clientY > row.getBoundingClientRect().top + row.offsetHeight / 2;
+  $$('.sec-row', $('#sectionToggles')).forEach(r => r.classList.remove('drop-before', 'drop-after'));
+  if (row.dataset.sec !== dragSection) row.classList.add(after ? 'drop-after' : 'drop-before');
+});
+$('#sectionToggles').addEventListener('drop', e => {
+  const row = e.target.closest('.sec-row[data-sec]');
+  if (!dragSection || !row) return;
+  e.preventDefault();
+  const target = row.dataset.sec, after = row.classList.contains('drop-after');
+  if (target !== dragSection) {
+    orderDraft = orderDraft.filter(id => id !== dragSection);
+    orderDraft.splice(orderDraft.indexOf(target) + (after ? 1 : 0), 0, dragSection);
+  }
+  dragSection = null;
+  buildSectionToggles();
+});
+$('#sectionToggles').addEventListener('dragend', () => {
+  if (!dragSection) return;
+  dragSection = null;
+  buildSectionToggles();
 });
 $('#resetSections').addEventListener('click', () => {
   sectionsDraft = [];
+  orderDraft = defaultOrder(customSections);
   buildSectionToggles();
 });
-const sectionsDirty = () => !sameJSON([...sectionsDraft].sort(), [...hiddenSections].sort());
-function commitSections() {
-  hiddenSections = [...sectionsDraft];
+const sectionsDirty = () => !sameJSON([...sectionsDraft].sort(), [...hiddenSections].sort()) || !sameJSON(orderDraft, sectionOrder);
+// Writes order + visibility (dropping ids of deleted sections, slotting in new ones)
+function storeSectionLayout() {
+  sectionOrder = normalizeOrder(sectionOrder, customSections);
+  hiddenSections = hiddenSections.filter(id => sectionOrder.includes(id));
+  sameJSON(sectionOrder, defaultOrder(customSections)) ? localStorage.removeItem('romelSectionOrder') : store.set('romelSectionOrder', sectionOrder);
   hiddenSections.length ? store.set('romelHiddenSections', hiddenSections) : localStorage.removeItem('romelHiddenSections');
-  applyVisibility();
+}
+function commitSections() {
+  sectionOrder = [...orderDraft];
+  hiddenSections = [...sectionsDraft];
+  storeSectionLayout();
+  sectionsDraft = [...hiddenSections];
+  orderDraft = [...sectionOrder];
+  renderSections();
+  if (typeof refreshEmptySpaces === 'function') refreshEmptySpaces();
+  buildSectionToggles();
+  if (typeof refreshMenuEyes === 'function') refreshMenuEyes();
 }
 function discardSections() {
   sectionsDraft = [...hiddenSections];
+  orderDraft = [...sectionOrder];
   buildSectionToggles();
 }
 // Closing the side panels asks Save / Discard when they have unsaved changes
 async function closeSectionsPanel() {
   if (sectionsPanel.hidden) return;
-  if (await resolveUnsaved(['sections'])) sectionsPanel.hidden = true;
+  if (!(await resolveUnsaved(['sections']))) return;
+  if (pickerInPanel()) hideIconPicker();
+  sectionsPanel.hidden = true;
 }
 async function closeCmsPanel() {
   if (cmsPanel.hidden) return;
@@ -1686,6 +1910,7 @@ function setRole(next) {
   else sessionStorage.setItem('romelRole', next);
   document.body.classList.toggle('role-admin', next === 'admin');
   document.body.classList.toggle('role-client', next === 'client');
+  layoutServiceGrid();
   if (next !== 'admin') { setEditing(false); cmsPanel.hidden = true; sectionsPanel.hidden = true; }
   showAdminSidebar(next === 'admin');
   $('#clientBadge').hidden = next !== 'client';
@@ -1954,7 +2179,107 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMobileS
 // On phones, close the sidebar after picking a tool so the page / panel underneath is visible
 sidebar.addEventListener('click', e => { if (isNarrow() && e.target.closest('#toggleEdit, #openSections, #openContent')) closeMobileSidebar(); });
 // Expandable sidebar sections (clicking one while collapsed expands the sidebar first)
-const SIDEBAR_SECTIONS = { niches: '#nicheEditor', hero: '#heroEditor', resume: '#resumeEditor', colors: '#colorEditor', logo: '#logoEditor', tools: '#toolsEditor', focus: '#focusEditor', services: '#servicesEditor', cards: '#cardsEditor' };
+/* --- CONTENT menu: hold the left mouse button on an item and drag it to a new place (Hero stays first).
+       Each item moves together with its settings panel; the order is remembered in this browser.
+       Sections added with "+ Add Content" join this list (see ADDED CONTENT below). --- */
+const BUILTIN_MENU = ['resume', 'tools', 'focus', 'services', 'cards'];
+const menuNav = action => { const btn = $(`[data-admin-action="${action}"]`); return btn && btn.closest('.side-nav'); };
+const movableMenu = () => [...BUILTIN_MENU, ...$$('[data-custom-nav]').map(n => n.dataset.customNav)];
+// Saved order first, then any item it doesn't mention yet (new items go to the end)
+const fullMenuOrder = order => {
+  const all = movableMenu(), out = order.filter((a, i) => all.includes(a) && order.indexOf(a) === i);
+  all.forEach(a => { if (!out.includes(a)) out.push(a); });
+  return out;
+};
+function applyMenuOrder(order) {
+  let prev = $('#heroEditor');
+  order.forEach(action => {
+    const nav = menuNav(action), panel = $(`#${action}Editor`);
+    if (!nav || !panel) return;
+    prev.after(nav);
+    nav.after(panel);
+    prev = panel;
+  });
+  prev.after($('#addContentNav'));
+  $('#addContentNav').after($('#addContentBox'));
+}
+let menuOrder = fullMenuOrder(store.get('romelMenuOrder', []));
+applyMenuOrder(menuOrder);
+let dragMenu = null;
+const menuLabel = action => $(`[data-admin-action="${action}"] > span`).textContent.trim();
+
+/* Shared yes / no dialog; closing it any other way (Esc, clicking outside) counts as "no" */
+function confirmDialog({ label, icon = 'fa-circle-question', title, body = '', yes = 'Confirm', no = 'Cancel', danger = false }) {
+  return new Promise(resolve => {
+    $('#confirmLabel').innerHTML = `<i class="fa-solid ${icon}"></i> ${escapeHtml(label)}`;
+    $('#confirmTitle').textContent = title;
+    $('#confirmBody').innerHTML = body;
+    $('#confirmYes span').textContent = yes;
+    $('#confirmYes i').className = `fa-solid ${danger ? 'fa-trash' : 'fa-check'}`;
+    $('#confirmNo span').textContent = no;
+    window.__confirmResolve = resolve;
+    openModal('confirmModal');
+  });
+}
+$$('[data-confirm]').forEach(btn => btn.addEventListener('click', () => {
+  const resolve = window.__confirmResolve;
+  window.__confirmResolve = null;
+  closeModal($('#confirmModal'), true);
+  if (resolve) resolve(btn.dataset.confirm === 'yes');
+}));
+const confirmMenuOrder = (moved, order) => confirmDialog({
+  label: 'NEW MENU ORDER', icon: 'fa-arrows-up-down', title: `Move "${menuLabel(moved)}" here?`,
+  body: `<ol class="menu-order-list">${['hero', ...order].map(a =>
+    `<li class="${a === moved ? 'moved' : ''}">${escapeHtml(menuLabel(a))}${a === 'hero' ? ' <small>(always first)</small>' : ''}</li>`).join('')}</ol>`
+});
+const clearMenuMarks = () => $$('.side-nav.menu-movable').forEach(n => n.classList.remove('drop-before', 'drop-after', 'dragging'));
+function makeMenuMovable(action) {
+  const nav = menuNav(action);
+  nav.draggable = true;
+  nav.classList.add('menu-movable');
+  nav.title = 'Drag to change the order';
+  nav.addEventListener('dragstart', e => {
+    dragMenu = action;
+    nav.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', action);
+  });
+  nav.addEventListener('dragover', e => {
+    if (!dragMenu) return;
+    e.preventDefault();
+    const after = e.clientY > nav.getBoundingClientRect().top + nav.offsetHeight / 2;
+    $$('.side-nav.menu-movable').forEach(n => n.classList.remove('drop-before', 'drop-after'));
+    if (action !== dragMenu) nav.classList.add(after ? 'drop-after' : 'drop-before');
+  });
+  nav.addEventListener('drop', e => {
+    if (!dragMenu) return;
+    e.preventDefault();
+    const moved = dragMenu, after = nav.classList.contains('drop-after');
+    dragMenu = null;
+    clearMenuMarks();
+    if (action === moved) return;
+    const current = fullMenuOrder(menuOrder);
+    const next = current.filter(a => a !== moved);
+    next.splice(next.indexOf(action) + (after ? 1 : 0), 0, moved);
+    if (sameJSON(next, current)) return;
+    // Show the new order right away, then keep it only if the admin confirms
+    applyMenuOrder(next);
+    confirmMenuOrder(moved, next).then(ok => {
+      if (ok) {
+        menuOrder = next;
+        store.set('romelMenuOrder', menuOrder);
+        toast('Menu order saved.');
+      } else {
+        applyMenuOrder(fullMenuOrder(menuOrder));
+        toast('Menu order unchanged.');
+      }
+    });
+  });
+  nav.addEventListener('dragend', () => { dragMenu = null; clearMenuMarks(); });
+}
+BUILTIN_MENU.forEach(makeMenuMovable);
+
+const SIDEBAR_SECTIONS = { niches: '#nicheEditor', hero: '#heroEditor', resume: '#resumeEditor', colors: '#colorEditor', logo: '#logoEditor', tools: '#toolsEditor', focus: '#focusEditor', services: '#servicesEditor', cards: '#cardsEditor', addContent: '#addContentBox' };
 function setSectionOpen(action, open) {
   const btn = $(`[data-admin-action="${action}"]`);
   $(SIDEBAR_SECTIONS[action]).hidden = !open;
@@ -1973,14 +2298,229 @@ async function openSidebarSection(action) {
   setSectionOpen(action, true);
   return true;
 }
-Object.keys(SIDEBAR_SECTIONS).forEach(action => $(`[data-admin-action="${action}"]`).addEventListener('click', async () => {
-  const wasCollapsed = sidebar.classList.contains('collapsed');
-  if (!wasCollapsed && !$(SIDEBAR_SECTIONS[action]).hidden) {
-    if (await resolveUnsaved([action])) setSectionOpen(action, false);
-    return;
+function bindSidebarAction(action) {
+  $(`[data-admin-action="${action}"]`).addEventListener('click', async () => {
+    const wasCollapsed = sidebar.classList.contains('collapsed');
+    if (!wasCollapsed && !$(SIDEBAR_SECTIONS[action]).hidden) {
+      if (await resolveUnsaved([action])) setSectionOpen(action, false);
+      return;
+    }
+    openSidebarSection(action);
+  });
+}
+Object.keys(SIDEBAR_SECTIONS).forEach(bindSidebarAction);
+
+/* ==========================================================================
+   ADDED CONTENT (sidebar → CONTENT → + Add Content): every added section gets
+   its own menu item + editor with its own Save / Discard. A new section exists
+   only as a draft until saved; Discard on an unsaved one removes it again.
+   ========================================================================== */
+const contentDrafts = {};
+let contentUploadTarget = null;
+const savedContent = id => customSections.find(c => c.id === id) || null;
+const contentLabel = c => c.title.trim() || c.tag.trim() || 'Untitled section';
+function renderContentForm(id) {
+  const c = contentDrafts[id], panel = $(`#${id}Editor`), btn = $(`[data-admin-action="${id}"]`);
+  $('.cs-form-mount', panel).innerHTML = customEditorHTML(c);
+  $('i', btn).className = c.icon;
+  updateContentLabel(id);
+}
+function updateContentLabel(id) {
+  const c = contentDrafts[id], btn = $(`[data-admin-action="${id}"]`);
+  $('span', btn).textContent = contentLabel(c);
+  btn.title = contentLabel(c);
+  if (CATEGORIES[id]) CATEGORIES[id].label = contentLabel(c);
+}
+function buildContentItem(id) {
+  const nav = document.createElement('nav');
+  nav.className = 'side-nav';
+  nav.dataset.customNav = id;
+  nav.innerHTML = `<button type="button" data-admin-action="${id}"><i></i><span></span><i class="fa-solid fa-chevron-right go"></i></button>`;
+  const panel = document.createElement('div');
+  panel.className = 'color-editor tools-editor cs-editor';
+  panel.id = id + 'Editor';
+  panel.hidden = true;
+  panel.innerHTML = '<div class="cs-form-mount"></div><div class="picker-mount"></div>'
+    + '<p class="field-hint">Show / hide this section or change its place on the page in <b>Sections</b> (EDIT menu).</p>'
+    + '<button type="button" class="btn btn-outline btn-sm btn-block cs-delete" data-cs-delete><i class="fa-solid fa-trash"></i><span>Delete This Content</span></button>';
+  $('#addContentNav').before(nav);
+  nav.after(panel);
+  SIDEBAR_SECTIONS[id] = `#${id}Editor`;
+  bindSidebarAction(id);
+  makeMenuMovable(id);
+  addMenuEye(id);
+  registerCategory(id, { label: 'Content', mount: `#${id}Editor`, nav: `[data-admin-action="${id}"]`,
+    isDirty: () => !!contentDrafts[id] && !sameJSON(contentDrafts[id], savedContent(id)),
+    save: () => commitContentItem(id), discard: () => discardContentItem(id) });
+  renderContentForm(id);
+
+  panel.addEventListener('input', e => {
+    const t = e.target, c = contentDrafts[id];
+    if (t.dataset.csField) {
+      c[t.dataset.csField] = t.value;
+      if (t.dataset.csField === 'title' || t.dataset.csField === 'tag') updateContentLabel(id);
+    } else if (t.dataset.csCard) c.cards[Number(t.dataset.i)][t.dataset.csCard] = t.value;
+    else return;
+    markDirty();
+  });
+  panel.addEventListener('click', e => {
+    const btn = e.target.closest('button');
+    if (!btn || !panel.contains(btn)) return;
+    const c = contentDrafts[id], mount = $('.picker-mount', panel);
+    if (btn.matches('[data-cs-icon]')) {
+      return showIconPicker(mount, `Label icon for "${contentLabel(c)}"`, c.icon, icon => { c.icon = icon; renderContentForm(id); markDirty(); }, null);
+    }
+    if (btn.dataset.csCardIcon != null) {
+      const k = c.cards[Number(btn.dataset.csCardIcon)];
+      return showIconPicker(mount, `Icon for "${k.title || 'card'}"`, k.icon, icon => { k.icon = icon; renderContentForm(id); markDirty(); }, null);
+    }
+    if (btn.matches('[data-cs-upload]')) { contentUploadTarget = id; return $('#secImageFile').click(); }
+    if (btn.matches('[data-cs-delete]')) return deleteContentItem(id);
+    if (btn.dataset.csCardRemove != null) c.cards.splice(Number(btn.dataset.csCardRemove), 1);
+    else if (btn.matches('[data-cs-card-add]')) c.cards.push({ icon: 'fa-solid fa-star', title: 'New card', text: 'Describe this card.' });
+    else return;
+    renderContentForm(id);
+    markDirty();
+  });
+}
+function removeContentItem(id) {
+  const panel = $(`#${id}Editor`);
+  if (panel.contains($('#iconPicker'))) hideIconPicker();
+  menuNav(id).remove();
+  panel.remove();
+  delete SIDEBAR_SECTIONS[id];
+  delete CATEGORIES[id];
+  delete contentDrafts[id];
+  markDirty();
+}
+// The Sections panel's draft order picks up added / deleted sections without losing its own unsaved moves
+function syncSectionsDraft() {
+  orderDraft = normalizeOrder(orderDraft, customSections);
+  sectionsDraft = sectionsDraft.filter(id => orderDraft.includes(id));
+  if (!sectionsPanel.hidden) buildSectionToggles();
+}
+function storeCustomSections(list) {
+  try { list.length ? store.set('romelCustomSections', list) : localStorage.removeItem('romelCustomSections'); }
+  catch (err) { toast('Browser storage is full — try a smaller image, then Save again.'); return false; }
+  customSections = list;
+  storeSectionLayout();
+  syncSectionsDraft();
+  renderSections();
+  if (typeof refreshEmptySpaces === 'function') refreshEmptySpaces();
+  refreshMenuEyes();
+  return true;
+}
+function commitContentItem(id) {
+  const draft = deepCopy(contentDrafts[id]);
+  const list = savedContent(id) ? customSections.map(c => c.id === id ? draft : c) : [...customSections, draft];
+  if (!storeCustomSections(list)) return false;
+}
+function discardContentItem(id) {
+  const saved = savedContent(id);
+  if (!saved) return removeContentItem(id); // never saved: discarding removes the new item
+  if ($(`#${id}Editor`).contains($('#iconPicker'))) hideIconPicker();
+  contentDrafts[id] = deepCopy(saved);
+  renderContentForm(id);
+}
+async function deleteContentItem(id) {
+  const name = contentLabel(contentDrafts[id]);
+  const ok = await confirmDialog({ label: 'DELETE CONTENT', icon: 'fa-trash', title: `Delete "${name}"?`,
+    body: '<p class="muted small">It is removed from the page and from this menu. This cannot be undone.</p>', yes: 'Delete', danger: true });
+  if (!ok) return;
+  if (savedContent(id) && !storeCustomSections(customSections.filter(c => c.id !== id))) return;
+  removeContentItem(id);
+  toast(`Deleted "${name}".`);
+}
+$('#secImageFile').addEventListener('change', e => {
+  const file = e.target.files[0], id = contentUploadTarget;
+  e.target.value = '';
+  const c = contentDrafts[id];
+  if (!file || !c) return;
+  if (!file.type.startsWith('image/')) return toast('Please choose an image file.');
+  compressImage(file, data => { c.image = data; renderContentForm(id); markDirty(); toast('Image ready — click Save changes to put it on the page.'); });
+});
+$('#addContentBox').addEventListener('click', async e => {
+  const btn = e.target.closest('[data-add-content]');
+  if (!btn) return;
+  const type = btn.dataset.addContent;
+  let id;
+  do id = 'custom-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); while (document.getElementById(id) || contentDrafts[id]);
+  const c = { id, type, icon: 'fa-solid fa-star', tag: `New ${CUSTOM_TYPES[type]} Section`, title: 'Your section title', intro: '', nav: '', text: '', cards: [], image: '', caption: '' };
+  if (type === 'text') c.text = 'Write your text here.';
+  if (type === 'cards') c.cards = [{ icon: 'fa-solid fa-star', title: 'First card', text: 'Describe this card.' }];
+  contentDrafts[id] = c;
+  buildContentItem(id);
+  refreshMenuEyes();
+  applyMenuOrder(fullMenuOrder(menuOrder));
+  setSectionOpen('addContent', false);
+  if (!(await openSidebarSection(id))) return;
+  markDirty();
+  const field = $(`#${id}Editor [data-cs-field="title"]`);
+  field.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  field.focus({ preventScroll: true });
+  field.select();
+  toast('New content added — edit it, then click Save changes to put it on the page.');
+});
+customSections.forEach(c => { contentDrafts[c.id] = deepCopy(c); buildContentItem(c.id); });
+applyMenuOrder(fullMenuOrder(menuOrder));
+
+/* --- Eye next to each CONTENT menu item: hides that content from visitors right away (admins still see it, dimmed).
+       Added sections use the same hidden list as the Sections panel. My Resume has no eye. --- */
+const EYE_ITEMS = ['tools', 'focus', 'services', 'cards'];
+const isContentHidden = key => EYE_ITEMS.includes(key) ? hiddenContent.includes(key) : hiddenSections.includes(key);
+function addMenuEye(key) {
+  const nav = menuNav(key);
+  if (!nav || $('.menu-eye', nav)) return;
+  nav.classList.add('has-eye');
+  const eye = document.createElement('button');
+  eye.type = 'button';
+  eye.className = 'menu-eye';
+  eye.dataset.contentEye = key;
+  nav.appendChild(eye);
+}
+function refreshMenuEyes() {
+  $$('[data-content-eye]').forEach(eye => {
+    const key = eye.dataset.contentEye, hidden = isContentHidden(key);
+    eye.innerHTML = eyeIcon(!hidden);
+    eye.title = `${hidden ? 'Show' : 'Hide'} "${menuLabel(key)}" on the page`;
+    eye.setAttribute('aria-label', eye.title);
+    eye.closest('.side-nav').classList.toggle('content-off', hidden);
+  });
+}
+function addAllMenuEyes() {
+  [...EYE_ITEMS, ...Object.keys(contentDrafts)].forEach(addMenuEye);
+  refreshMenuEyes();
+}
+const EYE_HIDES = {
+  tools: 'The scrolling Tools &amp; Technologies card',
+  focus: 'The Current Focus card',
+  services: 'The service cards and their "What I can do." heading',
+  cards: 'Every section Page Cards manages (all sections except Hero and the ones you added)'
+};
+$('#adminSidebar').addEventListener('click', async e => {
+  const eye = e.target.closest('[data-content-eye]');
+  if (!eye) return;
+  const key = eye.dataset.contentEye, name = menuLabel(key), hide = !isContentHidden(key);
+  if (!EYE_ITEMS.includes(key) && !savedContent(key)) return toast('Save this content first, then you can hide it.');
+  // Hiding only takes effect after the admin confirms
+  if (hide && !(await confirmDialog({ label: 'HIDE CONTENT', icon: 'fa-eye-slash', title: `Hide "${name}"?`, yes: 'Hide',
+    body: `<p class="muted small">${EYE_HIDES[key] || 'This whole section'} will be removed from the page, and the remaining content moves up to fill the space. Click the eye again to bring it back.</p>` }))) return;
+  if (EYE_ITEMS.includes(key)) {
+    hiddenContent = hide ? [...hiddenContent, key] : hiddenContent.filter(k => k !== key);
+    hiddenContent.length ? store.set('romelHiddenContent', hiddenContent) : localStorage.removeItem('romelHiddenContent');
+  } else {
+    const toggle = list => hide ? [...new Set([...list, key])] : list.filter(id => id !== key);
+    hiddenSections = toggle(hiddenSections);
+    sectionsDraft = toggle(sectionsDraft);
+    storeSectionLayout();
+    if (!sectionsPanel.hidden) buildSectionToggles();
   }
-  openSidebarSection(action);
-}));
+  applyVisibility();
+  if (typeof refreshEmptySpaces === 'function') refreshEmptySpaces();
+  refreshMenuEyes();
+  toast(hide ? `"${name}" is hidden from visitors.` : `"${name}" is visible again.`);
+});
+addAllMenuEyes();
 
 /* --- Logo & Brand: uploaded logo replaces the "R" mark in header, footer and loader --- */
 const DEFAULT_LOGO_LETTER = 'R';
@@ -2317,19 +2857,23 @@ function discardCards() {
 
 /* Auto-tidy: collapse whatever hidden cards leave empty, so spacing stays uniform for clients */
 // Only the admin's hide counts here — workflow cards hidden by the n8n / Zapier filter tabs are still "shown"
-const isShown = el => !el.classList.contains('card-hidden');
+const isShown = el => !el.classList.contains('card-hidden') && !el.classList.contains('content-hidden');
 function refreshEmptySpaces() {
   // A column with nothing visible is removed and its partner takes the full width
   $$('#about .about-grid, #calendars .split-grid, #contact .contact-grid').forEach(grid => {
     const cols = [...grid.children];
     cols.forEach(col => col.classList.toggle('col-empty', ![...col.children].some(isShown)));
     grid.classList.toggle('single-col', cols.filter(col => !col.classList.contains('col-empty')).length === 1);
+    // Content hidden with a sidebar eye is gone for the admin too, so a column left with nothing collapses there as well
+    cols.forEach(col => col.classList.toggle('col-void', ![...col.children].some(c => !c.classList.contains('content-hidden'))));
+    grid.classList.toggle('single-col-all', cols.filter(col => !col.classList.contains('col-void')).length === 1);
   });
   // Card grids with nothing visible take no space at all
   $$('#servicesGrid, #workflows .card-grid, #integrations .card-grid, #funnels .card-grid, #approvals .card-grid')
     .forEach(grid => grid.classList.toggle('grid-empty', ![...grid.children].some(isShown)));
+  layoutServiceGrid();
   // A section with no visible cards and no other content is dropped entirely
-  const hasOtherContent = { contact: true, approvals: $$('#approvals .img-preview').length > 0, services: servicesSaved.length > 0 };
+  const hasOtherContent = { contact: true, approvals: $$('#approvals .img-preview').length > 0, services: servicesSaved.some(s => !s.hidden) };
   autoEmptySections = new Set(cardSections.filter(section =>
     !hasOtherContent[section] && !CARD_ZONES.filter(z => z.section === section).some(z => [...z.el.children].some(c => c.classList.contains('card') && isShown(c)))));
   applyVisibility();
@@ -2473,7 +3017,7 @@ renderCardManager();
    A niche stores every admin setting; "Save Niche" writes them all to niches.js
    (via the local server), which every visitor loads. Links: ?niche=<slug>.
    ========================================================================== */
-const NICHE_KEYS = ['romelPageEditsV3', 'romelHiddenSections', 'romelPortfolioContent', 'romelTheme', 'romelThemeColors', 'romelThemeCache', 'romelLogo', 'romelBrand', 'romelTools', 'romelFocus', 'romelServices', 'romelCards', 'romelHero', 'romelImages', 'romelResume'];
+const NICHE_KEYS = ['romelPageEditsV3', 'romelHiddenSections', 'romelPortfolioContent', 'romelTheme', 'romelThemeColors', 'romelThemeCache', 'romelLogo', 'romelBrand', 'romelTools', 'romelFocus', 'romelServices', 'romelCards', 'romelHero', 'romelImages', 'romelResume', 'romelSectionOrder', 'romelCustomSections', 'romelHiddenContent'];
 let nicheData = JSON.parse(JSON.stringify(window.ROMEL_NICHES || { default: null, niches: {} }));
 if (!nicheData.niches) nicheData.niches = {};
 let pendingNiche = loadJSON('romelPendingNiche', null); // created in the panel but not saved yet
@@ -2878,6 +3422,15 @@ async function openSettingsFor(t) {
   const image = MANAGED_IMAGES.find(m => m.el.contains(t));
   if (image) return $(`[data-img-edit="${image.id}"]`).click();
 
+  // An added section (or its menu tab) opens its editor in the Sections panel
+  const customTab = within('.portfolio-tabs a[data-custom]');
+  const customSec = customTab ? document.getElementById(customTab.getAttribute('href').slice(1)) : within('.custom-section');
+  if (customSec && SIDEBAR_SECTIONS[customSec.id]) {
+    if (!(await open(customSec.id))) return;
+    const field = $(`#${customSec.id}Editor [data-cs-field="title"]`);
+    return spotlight(field.closest('.sec-field'), field);
+  }
+
   if (within('.brand, .site-footer .brand-mark, [data-brand], .loader-core')) {
     if (!(await open('logo'))) return;
     const field = within('[data-brand="tagline"]') ? $('#brandTaglineInput') : $('#brandNameInput');
@@ -2927,7 +3480,7 @@ async function openSettingsFor(t) {
   const service = within('#servicesGrid .service');
   if (service) {
     if (!(await open('services'))) return;
-    const field = $(`[data-svc-field="title"][data-i="${indexIn(service, service.parentElement)}"]`);
+    const field = $(`[data-svc-field="title"][data-i="${service.dataset.svcI}"]`);
     return field ? spotlight(rowOf(field), field) : spotlight($('#svcList'));
   }
   // Ordinary text: switch on Edit Text and put the cursor in it
