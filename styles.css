@@ -754,6 +754,13 @@ html.is-light .modal-box { border-color: var(--border); box-shadow: 0 25px 50px 
 .video-head { display: flex; align-items: center; justify-content: space-between; padding: .9rem 1rem; background: var(--canvas); border-bottom: 1px solid var(--border); }
 .video-head h4 { font-size: .9rem; margin-right: auto; }
 .video-head { gap: 1rem; }
+/* Connect GitHub pop-up */
+.github-box { max-width: 32rem; display: flex; flex-direction: column; gap: .8rem; }
+.github-box p { font-size: .85rem; line-height: 1.55; color: var(--soft, #CBD5E1); }
+.github-steps { margin: 0; padding-left: 1.2rem; display: grid; gap: .4rem; font-size: .82rem; line-height: 1.5; color: var(--soft, #CBD5E1); }
+.github-steps a { color: var(--turq); }
+.github-box .field-hint.is-error { color: #F87171; }
+.github-disconnect { align-self: center; border: 0; background: none; color: #94A3B8; font-size: .75rem; cursor: pointer; text-decoration: underline; }
 .video-note { display: flex; align-items: center; gap: .6rem; padding: .7rem 1rem; font-size: .8rem; color: #FBBF24; background: rgba(251, 191, 36, .08); border-top: 1px solid var(--border); }
 /* Volume control in the video pop-up header */
 .video-volume { display: flex; align-items: center; gap: .55rem; padding: .3rem .75rem .3rem .35rem; border-radius: 99px; border: 1px solid var(--border); background: var(--surface); }

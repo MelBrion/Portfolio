@@ -447,6 +447,7 @@ function closeModal(modal, force = false) {
   if (modal.id === 'unsavedModal' && window.__unsavedResolve) { window.__unsavedResolve('cancel'); window.__unsavedResolve = null; }
   // Closing the yes / no prompt any other way (Esc, clicking outside) counts as "no"
   if (modal.id === 'confirmModal' && window.__confirmResolve) { window.__confirmResolve(false); window.__confirmResolve = null; }
+  if (modal.id === 'githubModal' && window.__githubResolve) { window.__githubResolve(false); window.__githubResolve = null; }
   // Closing Edit Font without Apply drops the preview
   if (modal.id === 'fontModal' && typeof revertFontPreview === 'function') revertFontPreview();
   modal.hidden = true;
@@ -649,7 +650,7 @@ function playVideo(url, title, emptyText) {
     const v = $('#videoPlayer');
     v.muted = false;
     applyVideoVolume();
-    v.src = url;
+    v.src = playableUrl(url);
     v.play().catch(() => {});
   }
   // Phone videos (MP4 / MOV) carry AAC sound. A few embedded browsers (e.g. VS Code's preview) show the
@@ -702,6 +703,146 @@ document.addEventListener('keydown', e => {
   if (e.key === 'm' || e.key === 'M') $('#videoMute').click();
 });
 $$('[data-video]').forEach(btn => btn.addEventListener('click', () => playVideo(btn.dataset.video, btn.dataset.title)));
+
+/* ==========================================================================
+   SAVING FILES: the local server on localhost; GitHub (the repository behind GitHub Pages) on the live site
+   ========================================================================== */
+const GITHUB = { owner: 'MelBrion', repo: 'Portfolio', branch: 'main' };
+function onLocalServer() { return ['localhost', '127.0.0.1'].includes(location.hostname); }
+// The token stays in this browser only (it is not one of the NICHE_KEYS, so it never goes into niches.js)
+const githubToken = () => { try { return localStorage.getItem('romelGithubToken') || ''; } catch (e) { return ''; } };
+// Files uploaded in this visit play from the device right away, before GitHub Pages publishes them
+const freshUploads = {};
+const playableUrl = url => freshUploads[url] || url;
+
+function githubRequest(path, { method = 'GET', body, token = githubToken(), onProgress } = {}) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open(method, `https://api.github.com/repos/${GITHUB.owner}/${GITHUB.repo}${path}`);
+    xhr.setRequestHeader('Accept', 'application/vnd.github+json');
+    xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+    xhr.setRequestHeader('X-GitHub-Api-Version', '2022-11-28');
+    if (body) xhr.setRequestHeader('Content-Type', 'application/json');
+    if (onProgress) xhr.upload.onprogress = e => { if (e.lengthComputable) onProgress(e.loaded / e.total); };
+    xhr.onload = () => {
+      let data = null;
+      try { data = xhr.responseText ? JSON.parse(xhr.responseText) : null; } catch (e) {}
+      if (xhr.status >= 200 && xhr.status < 300) return resolve(data);
+      const err = new Error((data && data.message) || 'GitHub error ' + xhr.status);
+      err.status = xhr.status;
+      reject(err);
+    };
+    xhr.onerror = () => reject(Object.assign(new Error('No connection to GitHub'), { status: 0 }));
+    xhr.send(body ? JSON.stringify(body) : null);
+  });
+}
+const toBase64 = blob => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => resolve(String(reader.result).split(',')[1] || '');
+  reader.onerror = () => reject(reader.error);
+  reader.readAsDataURL(blob);
+});
+
+// Opens the Connect GitHub pop-up; resolves true once a working token is saved
+function connectGithub(reason) {
+  $('#githubTitle').textContent = githubToken() ? 'GitHub connection' : 'Connect GitHub to save online';
+  $('#githubStatus').textContent = reason || (githubToken() ? 'Connected. Paste a new token to replace it.' : '');
+  $('#githubStatus').className = 'field-hint';
+  $('#githubToken').value = '';
+  $('#githubDisconnect').hidden = !githubToken();
+  openModal('githubModal');
+  setTimeout(() => $('#githubToken').focus(), 50);
+  return new Promise(resolve => { window.__githubResolve = resolve; });
+}
+$('#githubConnect').addEventListener('click', async () => {
+  const token = $('#githubToken').value.trim(), status = $('#githubStatus'), button = $('#githubConnect');
+  if (!token) return $('#githubToken').focus();
+  button.disabled = true;
+  status.className = 'field-hint';
+  status.textContent = 'Checking the token…';
+  try {
+    const repo = await githubRequest('', { token });
+    if (!repo.permissions || !repo.permissions.push) throw Object.assign(new Error('read-only'), { status: 403 });
+    localStorage.setItem('romelGithubToken', token);
+    const resolve = window.__githubResolve;
+    window.__githubResolve = null;
+    closeModal($('#githubModal'));
+    toast('GitHub connected. Uploads and Save Niche now save to your repository.');
+    if (resolve) resolve(true);
+  } catch (e) {
+    status.className = 'field-hint is-error';
+    status.textContent = e.status === 401 ? 'GitHub did not accept that token. Check you copied all of it.'
+      : e.status === 404 ? 'That token cannot see the Portfolio repository. Under Repository access, choose Portfolio.'
+      : e.status === 403 ? 'That token can only read. Set Contents to "Read and write".'
+      : 'Could not reach GitHub. Check your internet connection and try again.';
+  }
+  button.disabled = false;
+});
+$('#githubToken').addEventListener('keydown', e => { if (e.key === 'Enter') $('#githubConnect').click(); });
+$('#githubDisconnect').addEventListener('click', () => {
+  try { localStorage.removeItem('romelGithubToken'); } catch (e) {}
+  closeModal($('#githubModal'));
+  toast('GitHub disconnected from this browser.');
+});
+
+// One commit with any number of files: [{ path, blob }] or [{ path, text }]. Progress covers the upload of the files.
+async function githubCommit(files, message, onProgress) {
+  if (!githubToken() && !(await connectGithub())) return false;
+  const run = async () => {
+    const total = files.reduce((n, f) => n + (f.blob ? f.blob.size : f.text.length), 0) || 1;
+    let done = 0;
+    const tree = [];
+    for (const f of files) {
+      const size = f.blob ? f.blob.size : f.text.length;
+      const content = f.blob ? await toBase64(f.blob) : f.text;
+      const blob = await githubRequest('/git/blobs', { method: 'POST', body: { content, encoding: f.blob ? 'base64' : 'utf-8' },
+        onProgress: p => onProgress && onProgress((done + p * size) / total) });
+      done += size;
+      tree.push({ path: f.path, mode: '100644', type: 'blob', sha: blob.sha });
+    }
+    // Retried once if the branch moved meanwhile (e.g. two saves at the same time)
+    for (let attempt = 0; ; attempt++) {
+      const ref = await githubRequest(`/git/ref/heads/${GITHUB.branch}`);
+      const head = await githubRequest(`/git/commits/${ref.object.sha}`);
+      const newTree = await githubRequest('/git/trees', { method: 'POST', body: { base_tree: head.tree.sha, tree } });
+      const commit = await githubRequest('/git/commits', { method: 'POST', body: { message, tree: newTree.sha, parents: [ref.object.sha] } });
+      try { await githubRequest(`/git/refs/heads/${GITHUB.branch}`, { method: 'PATCH', body: { sha: commit.sha } }); return true; }
+      catch (e) { if (attempt || e.status !== 422) throw e; }
+    }
+  };
+  try { return await run(); }
+  catch (e) {
+    if (e.status === 401 || e.status === 403 || e.status === 404) {
+      // The token expired or lost access: ask for a new one, then try once more
+      if (await connectGithub('GitHub refused the saved token (it may have expired). Paste a new one.')) return await run();
+      return false;
+    }
+    throw e;
+  }
+}
+
+// Saves an uploaded file into a site folder (videos/, resumes/) and returns its site path, e.g. "videos/2026…-clip.mp4"
+async function saveSiteFile(folder, file, onProgress) {
+  const ext = (file.name.match(/\.[a-z0-9]+$/i) || [''])[0].toLowerCase();
+  if (onLocalServer()) {
+    const endpoint = folder === 'videos' ? '/__upload-video' : '/__upload-resume';
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${endpoint}?name=${encodeURIComponent(file.name)}`);
+      xhr.upload.onprogress = e => { if (e.lengthComputable && onProgress) onProgress(e.loaded / e.total); };
+      xhr.onload = () => xhr.status === 200 ? resolve(xhr.responseText.trim()) : reject(Object.assign(new Error('upload ' + xhr.status), { status: xhr.status }));
+      xhr.onerror = () => reject(new Error('Local server not reachable'));
+      xhr.send(file);
+    });
+  }
+  const stamp = new Date().toISOString().replace(/\D/g, '').slice(0, 14);
+  const safe = file.name.replace(/\.[^.]+$/, '').replace(/[^A-Za-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '') || 'file';
+  const path = `${folder}/${stamp}-${safe}${ext}`;
+  const ok = await githubCommit([{ path, blob: file }], `Upload ${folder === 'videos' ? 'video' : 'resume'}: ${file.name}`, onProgress);
+  if (!ok) return null; // the admin closed the Connect GitHub pop-up
+  freshUploads[path] = URL.createObjectURL(file);
+  return path;
+}
 
 /* ==========================================================================
    TECH MARQUEE
@@ -1238,28 +1379,27 @@ $('#heroVideoFile').addEventListener('change', e => {
   if (!file) return;
   if (!/\.(mp4|m4v|mov|webm|ogg)$/i.test(file.name)) return toast('Please choose an MP4, MOV or WebM video.');
   if (file.size > 95 * 1024 * 1024) return toast(`That video is ${Math.round(file.size / 1048576)} MB — the limit is 95 MB. Trim it or record at 1080p, then try again.`);
-  // Sent to the local server (saved in the project's videos/ folder), with a progress bar
+  // Saved into the site's videos/ folder: through the local server on localhost, or into GitHub on the live site
   const button = $('#uploadHeroVideo'), bar = $('#heroVideoProgress');
   button.disabled = true;
   bar.hidden = false;
   bar.firstElementChild.style.width = '0%';
-  const xhr = new XMLHttpRequest();
-  xhr.open('POST', `/__upload-video?name=${encodeURIComponent(file.name)}`);
-  xhr.upload.onprogress = ev => { if (ev.lengthComputable) bar.firstElementChild.style.width = Math.round(ev.loaded / ev.total * 100) + '%'; };
-  const done = () => { button.disabled = false; bar.hidden = true; };
-  xhr.onload = () => {
-    done();
-    const path = xhr.responseText.trim();
-    if (xhr.status !== 200 || !isUploadedVideo(path)) return toast(xhr.status === 413 ? 'That video is too large (max 95 MB).' : 'Upload failed — open the site from http://localhost:8000 and try again.');
-    hero.video.link = path;
-    hero.video.fileName = file.name;
-    hero.video.show = true;
-    saveHero();
-    renderHeroEditor();
-    toast('Video uploaded — click Save changes to put it on the button.');
-  };
-  xhr.onerror = () => { done(); toast('Upload failed — open the site from http://localhost:8000 and try again.'); };
-  xhr.send(file);
+  saveSiteFile('videos', file, p => bar.firstElementChild.style.width = Math.round(p * 100) + '%')
+    .then(path => {
+      if (path === null) return; // Connect GitHub was cancelled
+      if (!isUploadedVideo(path)) throw new Error('bad path');
+      hero.video.link = path;
+      hero.video.fileName = file.name;
+      hero.video.show = true;
+      saveHero();
+      renderHeroEditor();
+      toast(onLocalServer() ? 'Video uploaded — click Save changes to put it on the button.'
+        : 'Video uploaded to GitHub — click Save changes, then Save Niche. Visitors see it in about 1–2 minutes.');
+    })
+    .catch(e => toast(e.status === 413 ? 'That video is too large (max 95 MB).'
+      : onLocalServer() ? 'Upload failed — check the local server is running and try again.'
+      : 'Upload to GitHub failed: ' + e.message))
+    .finally(() => { button.disabled = false; bar.hidden = true; });
 });
 $('#removeHeroVideoFile').addEventListener('click', () => {
   hero.video.link = '';
@@ -2913,7 +3053,7 @@ function renderResumeEditor() {
   $('#resumeFileName').textContent = resumeDraft ? resumeDraft.name : 'No resume uploaded yet';
   $('#uploadResume span').textContent = resumeDraft ? 'Replace Resume' : 'Upload Resume';
   $('#previewResume').hidden = !resumeDraft;
-  if (resumeDraft) $('#previewResume').href = resumeDraft.url;
+  if (resumeDraft) $('#previewResume').href = playableUrl(resumeDraft.url);
   $('#removeResume').disabled = !resumeDraft;
   markDirty();
 }
@@ -2924,13 +3064,16 @@ async function uploadResumeFile(file) {
   const button = $('#uploadResume');
   button.disabled = true;
   try {
-    const r = await fetch(`/__upload-resume?name=${encodeURIComponent(file.name)}`, { method: 'POST', body: file });
-    if (!r.ok) throw new Error(String(r.status));
-    resumeDraft = { url: (await r.text()).trim(), name: file.name };
-    renderResumeEditor();
-    toast('Resume uploaded — click Save changes to use it.');
+    // Saved into resumes/: through the local server on localhost, or into GitHub on the live site
+    const path = await saveSiteFile('resumes', file);
+    if (path) {
+      resumeDraft = { url: path, name: file.name };
+      renderResumeEditor();
+      toast(onLocalServer() ? 'Resume uploaded — click Save changes to use it.'
+        : 'Resume uploaded to GitHub — click Save changes, then Save Niche. Live in about 1–2 minutes.');
+    }
   } catch (e) {
-    toast('Upload failed — open the site from http://localhost:8000 and try again.');
+    toast(onLocalServer() ? 'Upload failed — check the local server is running and try again.' : 'Upload to GitHub failed: ' + e.message);
   }
   button.disabled = false;
 }
@@ -3262,9 +3405,21 @@ function hasUnsavedChanges() {
   return info.unsavedNew || JSON.stringify(snapshotSettings()) !== JSON.stringify(nicheData.niches[info.slug].settings || {});
 }
 
-// Writes niches.js into the project through the local server; elsewhere (e.g. GitHub Pages) downloads it instead
+// Writes niches.js into the project: through the local server on localhost, or into GitHub on the live site.
+// If neither works, niches.js is downloaded instead.
 async function publishNiches() {
   const body = JSON.stringify(nicheData);
+  const file = `/* Saved niche presets - written by the admin 'Save niche' button. */\nwindow.ROMEL_NICHES = ${body};\n`;
+  if (!onLocalServer()) {
+    try {
+      if (await githubCommit([{ path: 'niches.js', text: file }], 'Save niches from the live site')) return true;
+      toast('Not saved — connect GitHub to save from the live site.');
+      return false;
+    } catch (e) {
+      toast('Saving to GitHub failed: ' + e.message);
+      return false;
+    }
+  }
   try {
     const r = await fetch('/__save-niches', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body });
     if (!r.ok) throw new Error(String(r.status));
@@ -3394,7 +3549,8 @@ $('#saveNiche').addEventListener('click', async () => {
   sessionStorage.setItem('romelOpenNiches', '1');
   const ok = await publishNiches();
   renderNichePanel();
-  if (ok) toast(`"${info.name}" saved. Clients with its link now see this version.`);
+  if (ok) toast(onLocalServer() ? `"${info.name}" saved. Clients with its link now see this version.`
+    : `"${info.name}" saved to GitHub. Clients see this version in about 1–2 minutes.`);
 });
 
 // Every new niche asks for its starting point: a fresh default page or a copy of the current setup

@@ -792,6 +792,28 @@
   </div>
 
   <!-- Admin: shared yes / no confirmation (menu order, deleting added content) -->
+  <!-- GitHub connection: lets the live site (GitHub Pages) save uploads and niches into the repository -->
+  <div class="modal" id="githubModal" hidden>
+    <div class="modal-box unsaved-box github-box">
+      <span class="mono-label"><i class="fa-brands fa-github"></i> GitHub</span>
+      <h3 id="githubTitle">Connect GitHub to save online</h3>
+      <p>The live site is hosted on GitHub, so uploads and Save Niche are saved straight into your <strong>MelBrion/Portfolio</strong> repository. This needs a GitHub access token. You only paste it once, and it stays in this browser.</p>
+      <ol class="github-steps">
+        <li>Open <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">GitHub → New fine-grained token</a>.</li>
+        <li>Name it, e.g. "Portfolio site". Under <strong>Repository access</strong> choose <em>Only select repositories</em> → <strong>Portfolio</strong>.</li>
+        <li>Under <strong>Permissions → Repository permissions</strong>, set <strong>Contents</strong> to <em>Read and write</em>.</li>
+        <li>Click <strong>Generate token</strong>, copy it and paste it below.</li>
+      </ol>
+      <input type="password" class="tool-name" id="githubToken" placeholder="github_pat_…" autocomplete="off" spellcheck="false">
+      <p class="field-hint" id="githubStatus"></p>
+      <div class="unsaved-actions">
+        <button type="button" class="btn btn-primary" id="githubConnect"><i class="fa-solid fa-plug"></i><span>Connect</span></button>
+        <button type="button" class="btn btn-outline" data-close><i class="fa-solid fa-rotate-left accent"></i><span>Cancel</span></button>
+      </div>
+      <button type="button" class="github-disconnect" id="githubDisconnect" hidden><i class="fa-solid fa-link-slash"></i> Disconnect GitHub from this browser</button>
+    </div>
+  </div>
+
   <div class="modal" id="confirmModal" hidden>
     <div class="modal-box unsaved-box">
       <span class="mono-label" id="confirmLabel"></span>
