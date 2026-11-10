@@ -656,9 +656,25 @@ function playVideo(url, title, emptyText) {
   // Phone videos (MP4 / MOV) carry AAC sound. A few embedded browsers (e.g. VS Code's preview) show the
   // picture but cannot play AAC, so say so instead of playing silently.
   const noSound = file && /\.(mp4|m4v|mov)(\?|#|$)/i.test(url) && !$('#videoPlayer').canPlayType('audio/mp4; codecs="mp4a.40.2"');
-  $('#videoNote').hidden = !noSound;
+  showVideoNote(noSound ? NO_SOUND_NOTE : '');
   openModal('videoModal');
 }
+const NO_SOUND_NOTE = "This browser can't play the video's sound. Open the site in Chrome, Edge, Safari or on your phone to hear it.";
+function showVideoNote(text) {
+  $('#videoNoteText').textContent = text;
+  $('#videoNote').hidden = !text;
+}
+// A file that can't be loaded (e.g. not published yet) would otherwise leave a black box with greyed-out controls
+$('#videoPlayer').addEventListener('error', e => {
+  const v = e.target;
+  if (v.hidden || !v.getAttribute('src')) return;
+  $('#videoVolume').hidden = true;
+  const missing = v.error && v.error.code === 4 && isUploadedVideo(v.getAttribute('src'));
+  showVideoNote(missing
+    ? (document.body.classList.contains('role-admin') ? "This video file isn't on the website. Open Hero settings and upload it again with Upload Video File."
+                 : 'This video is not available right now. Please check back soon.')
+    : "This video couldn't be played. Try another browser, or upload it again as an MP4.");
+});
 
 // Volume: slider 0–100%, mute button, and ↑ / ↓ keys while the video is open. Remembered on this device.
 let videoVolume = 1, videoMuted = false;
