@@ -6,6 +6,19 @@
   <meta name="description" content="Romel — creative developer, designer, and digital problem solver.">
   <meta name="theme-color" content="#080C16">
   <title>Romel | Creative Developer</title>
+  <script>
+    /* Clean the address bar: drop tracking tags other sites add to links (e.g. ?utm_source=chatgpt.com).
+       Only the visible URL changes — no reload — and our own ?niche= link still works. */
+    (function () {
+      try {
+        var url = new URL(location.href), changed = false;
+        Array.from(url.searchParams.keys()).forEach(function (k) {
+          if (/^utm_/i.test(k) || ['fbclid', 'gclid', 'msclkid', 'ref', 'ref_src'].indexOf(k.toLowerCase()) > -1) { url.searchParams.delete(k); changed = true; }
+        });
+        if (changed) history.replaceState(history.state, '', url.pathname + (url.searchParams.toString() ? '?' + url.searchParams : '') + url.hash);
+      } catch (e) {}
+    })();
+  </script>
   <!-- Saved niche presets (written by the admin "Save niche" button) -->
   <script src="niches.js"></script>
   <script>

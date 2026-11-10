@@ -1538,7 +1538,7 @@ const store = {
   set: (key, value) => localStorage.setItem(key, JSON.stringify(value))
 };
 const cmsPanel = $('#cmsPanel'), sectionsPanel = $('#sectionsPanel');
-let role = sessionStorage.getItem('romelRole') || 'guest';
+let role = sessionStorage.getItem('romelRole') === 'admin' ? 'admin' : 'client';
 let hiddenSections = store.get('romelHiddenSections', []);
 // Content hidden with the eye in the sidebar CONTENT menu (tools / focus / services / cards)
 let hiddenContent = store.get('romelHiddenContent', []);
@@ -1904,21 +1904,22 @@ async function closeCmsPanel() {
   if (await resolveUnsaved(['content'])) cmsPanel.hidden = true;
 }
 
+// Everyone starts as a Client (view only); only Admin (after logging in) can change anything
 function setRole(next) {
   role = next;
-  if (next === 'guest') sessionStorage.removeItem('romelRole');
-  else sessionStorage.setItem('romelRole', next);
+  if (next === 'admin') sessionStorage.setItem('romelRole', 'admin');
+  else sessionStorage.removeItem('romelRole');
   document.body.classList.toggle('role-admin', next === 'admin');
   document.body.classList.toggle('role-client', next === 'client');
   layoutServiceGrid();
   if (next !== 'admin') { setEditing(false); cmsPanel.hidden = true; sectionsPanel.hidden = true; }
   showAdminSidebar(next === 'admin');
-  $('#clientBadge').hidden = next !== 'client';
-  $('#accountLabel').textContent = { admin: 'Admin', client: 'Client' }[next] || 'Account';
-  $('#accountIcon').className = { admin: 'fa-solid fa-user-shield', client: 'fa-solid fa-user' }[next] || 'fa-solid fa-user-lock';
-  $('#accountButton').classList.toggle('signed-in', next !== 'guest');
+  $('#clientBadge').hidden = true; // Client is the normal visitor view, so no "client view" banner
+  $('#accountLabel').textContent = next === 'admin' ? 'Admin' : 'Client';
+  $('#accountIcon').className = next === 'admin' ? 'fa-solid fa-user-shield' : 'fa-solid fa-user';
+  $('#accountButton').classList.toggle('signed-in', next === 'admin');
   $$('[data-role]').forEach(btn => btn.classList.toggle('current', btn.dataset.role === next));
-  $$('[data-role="signout"]').forEach(btn => btn.hidden = next === 'guest');
+  $$('[data-role="signout"]').forEach(btn => btn.hidden = next !== 'admin');
   applyVisibility();
 }
 
@@ -1945,11 +1946,12 @@ $$('[data-role]').forEach(btn => btn.addEventListener('click', () => {
     openModal('accountModal');
     setTimeout(() => $('#loginForm [name="password"]').focus(), 50);
   } else {
-    // Leaving admin mode: settle any unsaved category changes first
+    if (role !== 'admin') return toast('You are viewing the site as a client.');
+    // Leaving admin mode (Client or Sign out): settle any unsaved category changes first
     resolveUnsaved().then(ok => {
       if (!ok) return;
-      if (next === 'client') { setRole('client'); toast('Client view — read only.'); }
-      else { setRole('guest'); toast('Signed out.'); }
+      setRole('client');
+      toast(next === 'signout' ? 'Signed out — you are now viewing as a client.' : 'Client view — read only.');
     });
   }
 }));
