@@ -29,7 +29,7 @@
         var N = window.ROMEL_NICHES, ls = localStorage;
         if (!N || !N.niches) return;
         // V2 text edits are still accepted from older saved niches; the page upgrades them to V3 on load
-        var KEYS = ['romelPageEditsV3', 'romelPageEditsV2', 'romelHiddenSections', 'romelPortfolioContent', 'romelTheme', 'romelThemeColors', 'romelThemeCache', 'romelLogo', 'romelBrand', 'romelTools', 'romelFocus', 'romelServices', 'romelCards', 'romelHero', 'romelImages', 'romelResume', 'romelSectionOrder', 'romelCustomSections', 'romelHiddenContent'];
+        var KEYS = ['romelPageEditsV3', 'romelPageEditsV2', 'romelHiddenSections', 'romelPortfolioContent', 'romelTheme', 'romelThemeColors', 'romelThemeCache', 'romelLogo', 'romelBrand', 'romelTools', 'romelFocus', 'romelServices', 'romelCards', 'romelHero', 'romelImages', 'romelResume', 'romelSectionOrder', 'romelCustomSections', 'romelHiddenContent', 'romelFonts'];
         var asked = new URLSearchParams(location.search).get('niche'), active = ls.getItem('romelActiveNiche');
         var pending = JSON.parse(ls.getItem('romelPendingNiche') || 'null');
         if (!asked && pending && pending.slug === active) return; // a new niche being set up, not saved yet
@@ -45,6 +45,8 @@
       } catch (e) {}
     })();
   </script>
+  <!-- Site font set (admin sidebar → Edit Font); runs after the niche loader so a niche's fonts apply -->
+  <script src="fonts.js"></script>
   <script>try{var h=document.documentElement,t=localStorage.getItem('romelTheme')||'dark';if(t==='emerald')t='sunny';if(['slate','midnight','ocean','sunny'].indexOf(t)>-1)h.classList.add('theme-'+t);var light=t==='slate'||t==='sunny',c=JSON.parse(localStorage.getItem('romelThemeCache')||'null');if(c&&c.theme===t){h.style.cssText+=';'+c.css;light=c.light;if(c.neon&&!light)h.classList.add('is-neon')}if(light)h.classList.add('is-light')}catch(e){}</script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -190,6 +192,7 @@
               <span class="check-chip"><i class="fa-solid fa-check"></i></span>
             </div>
           </div>
+          <button type="button" class="btn btn-outline hero-video-btn" id="heroVideoBtn"><i class="fa-solid fa-circle-play accent"></i><span>My Loom Video</span></button>
         </div>
       </div>
     </section>
@@ -675,12 +678,19 @@
     <div class="modal-box video-box">
       <div class="video-head">
         <h4 id="videoTitle">Recording</h4>
+        <div class="video-volume" id="videoVolume" hidden>
+          <button type="button" class="vol-btn" id="videoMute" title="Mute / unmute" aria-label="Mute or unmute"><i class="fa-solid fa-volume-high"></i></button>
+          <input type="range" id="videoVolumeRange" min="0" max="100" step="1" value="100" aria-label="Volume">
+          <span id="videoVolumeValue">100%</span>
+        </div>
         <button type="button" class="close-btn plain" data-close aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
       </div>
       <div class="video-frame">
         <iframe id="videoFrame" title="Video player" allow="autoplay; fullscreen" allowfullscreen></iframe>
+        <video id="videoPlayer" controls playsinline hidden></video>
         <div class="video-empty" id="videoEmpty"><i class="fa-solid fa-film"></i><p>Demo recording coming soon.</p></div>
       </div>
+      <p class="video-note" id="videoNote" hidden><i class="fa-solid fa-volume-xmark"></i>This browser can't play the video's sound. Open the site in Chrome, Edge, Safari or on your phone to hear it.</p>
     </div>
   </div>
 
@@ -754,6 +764,30 @@
         <button type="button" class="btn btn-outline" data-unsaved="discard"><i class="fa-solid fa-rotate-left accent"></i><span>Discard</span></button>
       </div>
       <button type="button" class="keep-editing" data-unsaved="cancel">Keep editing</button>
+    </div>
+  </div>
+
+  <!-- Admin: choose a font set (Edit Font) -->
+  <div class="modal" id="fontModal" hidden>
+    <div class="modal-box font-box">
+      <div class="font-head">
+        <div>
+          <span class="mono-label"><i class="fa-solid fa-font"></i> EDIT FONT</span>
+          <h3>Suggested font sets</h3>
+          <p class="muted small">Each set pairs a heading, body and label font that suit every section of the site. Click a set to preview it on the page.</p>
+        </div>
+        <button type="button" class="close-btn plain" data-font-cancel aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+      <div class="font-filters" id="fontFilters">
+        <button type="button" class="active" data-font-filter="all">All</button>
+        <button type="button" data-font-filter="masculine"><i class="fa-solid fa-mars"></i> Masculine</button>
+        <button type="button" data-font-filter="feminine"><i class="fa-solid fa-venus"></i> Feminine</button>
+      </div>
+      <div class="font-grid" id="fontGrid"></div>
+      <div class="font-actions">
+        <button type="button" class="btn btn-outline" data-font-cancel><i class="fa-solid fa-rotate-left accent"></i><span>Cancel</span></button>
+        <button type="button" class="btn btn-primary" id="applyFont"><i class="fa-solid fa-check"></i><span>Apply Font Set</span></button>
+      </div>
     </div>
   </div>
 
@@ -896,6 +930,7 @@
     <nav class="side-nav">
       <span class="side-label">EDIT</span>
       <button type="button" id="toggleEdit" title="Edit Text"><i class="fa-solid fa-pen"></i><span>Edit Text</span><i class="fa-solid fa-chevron-right go"></i></button>
+      <button type="button" id="openFonts" title="Edit Font"><i class="fa-solid fa-font"></i><span>Edit Font <b class="niche-current" id="fontCurrentLabel"></b></span><i class="fa-solid fa-chevron-right go"></i></button>
       <button type="button" id="openSections" title="Sections"><i class="fa-solid fa-eye"></i><span>Sections</span><i class="fa-solid fa-chevron-right go"></i></button>
       <button type="button" id="openContent" title="Content"><i class="fa-solid fa-sliders"></i><span>Content</span><i class="fa-solid fa-chevron-right go"></i></button>
       <span class="side-label">APPEARANCE</span>
@@ -986,6 +1021,25 @@
         <div class="svc-list" id="heroButtons"></div>
         <div class="picker-mount" id="heroPickerMount"></div>
         <button type="button" class="btn btn-outline btn-sm btn-block" id="addHeroButton"><i class="fa-solid fa-plus accent"></i><span>Add Button</span></button>
+      </div>
+
+      <div class="hero-group">
+        <span class="field-head text-row">Video button<button type="button" class="row-reset" data-hero-reset="video" title="Reset video button"><i class="fa-solid fa-rotate-left"></i></button></span>
+        <div class="tool-row">
+          <button type="button" class="mini-btn" id="heroVideoToggle" title="Show / hide video button"><i class="fa-solid fa-eye"></i></button>
+          <input type="text" class="tool-name" id="heroVideoText" maxlength="40" placeholder="Button text">
+        </div>
+        <input type="url" class="tool-name" id="heroVideoLink" maxlength="500" placeholder="Paste your Loom link (or YouTube / Vimeo / .mp4)">
+        <div class="video-or"><span>or</span></div>
+        <div class="video-file-row" id="heroVideoFileRow" hidden>
+          <i class="fa-solid fa-file-video"></i><span id="heroVideoFileName"></span>
+          <button type="button" class="tool-remove" id="removeHeroVideoFile" title="Remove video file" aria-label="Remove video file"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <button type="button" class="btn btn-primary btn-sm btn-block" id="uploadHeroVideo"><i class="fa-solid fa-upload"></i><span>Upload Video File</span></button>
+        <div class="video-progress" id="heroVideoProgress" hidden><div></div></div>
+        <input type="file" id="heroVideoFile" accept="video/mp4,video/webm,video/quicktime,video/ogg,.mp4,.m4v,.mov,.webm,.ogg" hidden>
+        <span class="field-hint">Clicking the button under your photo plays this video in a pop-up. Upload a phone recording (MP4, MOV or WebM, max 95 MB) or paste a link. Visitors only see the button once a video is added.</span>
+        <button type="button" class="btn btn-outline btn-sm btn-block" id="testHeroVideo"><i class="fa-solid fa-circle-play accent"></i><span>Preview Video</span></button>
       </div>
 
       <div class="hero-group">

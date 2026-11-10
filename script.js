@@ -403,6 +403,23 @@ menuButton.addEventListener('click', () => {
   menuButton.setAttribute('aria-expanded', String(open));
   $('i', menuButton).className = open ? 'fa-solid fa-xmark' : 'fa-solid fa-bars';
 });
+// Tapping outside the ☰ menu, or widening the window until the full nav shows, closes it
+document.addEventListener('click', e => { if (!mobileMenu.hidden && !e.target.closest('#mobileMenu, #menuButton')) closeMobileMenu(); });
+window.addEventListener('resize', () => { if (!mobileMenu.hidden && !menuButton.offsetParent) closeMobileMenu(); }, { passive: true });
+
+// Every visit opens on the hero with the ☰ menu closed — the browser does not restore an old
+// scroll position or open a #section from the address
+if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+function startAtHero() {
+  closeMobileMenu();
+  if (location.hash) history.replaceState(null, '', location.pathname + location.search);
+  window.scrollTo(0, 0);
+}
+startAtHero();
+let visitorMoved = false; // a visitor who already started scrolling is never pulled back up
+['wheel', 'touchstart', 'keydown', 'mousedown'].forEach(ev => addEventListener(ev, () => visitorMoved = true, { once: true, passive: true }));
+window.addEventListener('load', () => { if (!visitorMoved) startAtHero(); });
+window.addEventListener('pageshow', e => { if (e.persisted) startAtHero(); });
 
 /* ==========================================================================
    MODALS (generic open / close, backdrop click, Esc)
@@ -430,8 +447,10 @@ function closeModal(modal, force = false) {
   if (modal.id === 'unsavedModal' && window.__unsavedResolve) { window.__unsavedResolve('cancel'); window.__unsavedResolve = null; }
   // Closing the yes / no prompt any other way (Esc, clicking outside) counts as "no"
   if (modal.id === 'confirmModal' && window.__confirmResolve) { window.__confirmResolve(false); window.__confirmResolve = null; }
+  // Closing Edit Font without Apply drops the preview
+  if (modal.id === 'fontModal' && typeof revertFontPreview === 'function') revertFontPreview();
   modal.hidden = true;
-  if (modal.id === 'videoModal') $('#videoFrame').src = 'about:blank';
+  if (modal.id === 'videoModal') { $('#videoFrame').src = 'about:blank'; const v = $('#videoPlayer'); v.pause(); v.removeAttribute('src'); v.load(); }
   if (modal.id === 'lightboxModal') { $('#lightboxImg').src = ''; lb.zoom = 1; lb.x = lb.y = 0; }
   if (!$$('.modal').some(m => !m.hidden)) document.body.style.overflow = '';
 }
@@ -609,16 +628,80 @@ function toEmbedUrl(url) {
   if (loom) return `https://www.loom.com/embed/${loom[1]}?autoplay=1&hide_owner=true&hide_share=true&hide_title=true&hideEmbedTopBar=true`;
   const yt = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([\w-]{11})/);
   if (yt) return `https://www.youtube.com/embed/${yt[1]}?autoplay=1`;
+  const vimeo = url.match(/vimeo\.com\/(?:video\/)?(\d+)/);
+  if (vimeo) return `https://player.vimeo.com/video/${vimeo[1]}?autoplay=1`;
   return url;
 }
-$$('[data-video]').forEach(btn => btn.addEventListener('click', () => {
-  const url = btn.dataset.video.trim();
-  $('#videoTitle').textContent = btn.dataset.title || 'Recording';
-  $('#videoFrame').hidden = !url;
+const isVideoFile = url => /\.(mp4|webm|ogg|mov|m4v)(\?|#|$)/i.test(url) || url.startsWith('data:video/');
+// Plays any link in the pop-up: Loom / YouTube / Vimeo embeds, or a direct video file
+function playVideo(url, title, emptyText) {
+  url = (url || '').trim();
+  const file = !!url && isVideoFile(url);
+  $('#videoTitle').textContent = title || 'Recording';
+  $('#videoFrame').hidden = !url || file;
+  $('#videoPlayer').hidden = !file;
   $('#videoEmpty').hidden = !!url;
-  $('#videoFrame').src = url ? toEmbedUrl(url) : 'about:blank';
+  $('#videoEmpty p').textContent = emptyText || 'Demo recording coming soon.';
+  $('#videoFrame').src = url && !file ? toEmbedUrl(url) : 'about:blank';
+  // The volume slider controls uploaded videos; Loom / YouTube / Vimeo have volume in their own player
+  $('#videoVolume').hidden = !file;
+  if (file) {
+    const v = $('#videoPlayer');
+    v.muted = false;
+    applyVideoVolume();
+    v.src = url;
+    v.play().catch(() => {});
+  }
+  // Phone videos (MP4 / MOV) carry AAC sound. A few embedded browsers (e.g. VS Code's preview) show the
+  // picture but cannot play AAC, so say so instead of playing silently.
+  const noSound = file && /\.(mp4|m4v|mov)(\?|#|$)/i.test(url) && !$('#videoPlayer').canPlayType('audio/mp4; codecs="mp4a.40.2"');
+  $('#videoNote').hidden = !noSound;
   openModal('videoModal');
-}));
+}
+
+// Volume: slider 0–100%, mute button, and ↑ / ↓ keys while the video is open. Remembered on this device.
+let videoVolume = 1, videoMuted = false;
+try { const saved = parseFloat(localStorage.getItem('romelVideoVolume')); if (saved >= 0 && saved <= 1) videoVolume = saved; } catch (e) {}
+function applyVideoVolume() {
+  const v = $('#videoPlayer'), pct = Math.round(videoVolume * 100);
+  v.volume = videoVolume;
+  v.muted = videoMuted || videoVolume === 0;
+  const range = $('#videoVolumeRange');
+  range.value = pct;
+  range.style.setProperty('--vol', (videoMuted ? 0 : pct) + '%');
+  $('#videoVolumeValue').textContent = videoMuted ? 'Muted' : pct + '%';
+  const icon = videoMuted || pct === 0 ? 'fa-volume-xmark' : pct < 50 ? 'fa-volume-low' : 'fa-volume-high';
+  $('#videoMute i').className = 'fa-solid ' + icon;
+  try { localStorage.setItem('romelVideoVolume', String(videoVolume)); } catch (e) {}
+}
+function setVideoVolume(value) {
+  videoVolume = Math.min(1, Math.max(0, value));
+  videoMuted = false;
+  applyVideoVolume();
+}
+$('#videoVolumeRange').addEventListener('input', e => setVideoVolume(e.target.value / 100));
+$('#videoMute').addEventListener('click', () => {
+  if (videoMuted || videoVolume === 0) { videoMuted = false; if (videoVolume === 0) videoVolume = .5; }
+  else videoMuted = true;
+  applyVideoVolume();
+});
+// The player's own speaker / slider stays in step with ours
+$('#videoPlayer').addEventListener('volumechange', e => {
+  const v = e.target;
+  if (Math.abs(v.volume - videoVolume) < .005 && v.muted === (videoMuted || videoVolume === 0)) return;
+  videoVolume = v.volume;
+  videoMuted = v.muted && v.volume > 0;
+  applyVideoVolume();
+});
+document.addEventListener('keydown', e => {
+  if ($('#videoModal').hidden || $('#videoVolume').hidden) return;
+  if (e.target.matches && e.target.matches('input:not([type="range"]), textarea')) return;
+  if (e.target === $('#videoVolumeRange') && e.key.startsWith('Arrow')) return; // the slider moves itself
+  if (e.key === 'ArrowUp') { e.preventDefault(); setVideoVolume(videoVolume + .1); }
+  if (e.key === 'ArrowDown') { e.preventDefault(); setVideoVolume(videoVolume - .1); }
+  if (e.key === 'm' || e.key === 'M') $('#videoMute').click();
+});
+$$('[data-video]').forEach(btn => btn.addEventListener('click', () => playVideo(btn.dataset.video, btn.dataset.title)));
 
 /* ==========================================================================
    TECH MARQUEE
@@ -1004,8 +1087,12 @@ const DEFAULT_HERO = {
     { text: 'Start a Project', icon: 'fa-solid fa-calendar-check', link: '#contact', style: 'primary', show: true },
     { text: 'View My Work', icon: 'fa-solid fa-play', link: '#funnels', style: 'outline', show: true }
   ],
-  photo: { src: '', show: true }
+  photo: { src: '', show: true },
+  video: { text: 'My Loom Video', link: '', show: true }
 };
+// A pasted http(s) link, or a file uploaded into the site's videos/ folder
+const isUploadedVideo = url => /^videos\/[\w-]+\.(mp4|m4v|mov|webm|ogg)$/i.test(url || '');
+const videoLink = url => { url = (url || '').trim(); return /^https?:\/\//i.test(url) || isUploadedVideo(url) ? url : ''; };
 // heroSaved = what the page shows; hero + heroText (headline / description) = the editor's draft
 let heroSaved = Object.assign(clone(DEFAULT_HERO), loadJSON('romelHero', {}));
 let hero = deepCopy(heroSaved);
@@ -1040,10 +1127,26 @@ function renderHero() {
   $('.portrait-photo').src = hero.photo.src || 'Romel Photo.jpg';
   $('#hero .hero-visual').hidden = !hero.photo.show;
   $('#hero .hero-grid').classList.toggle('no-photo', !hero.photo.show);
+
+  // Video button: under the photo, or beside the other buttons when the photo is hidden.
+  // Without a link it only shows for the admin (dimmed), never for visitors.
+  const video = Object.assign(clone(DEFAULT_HERO.video), hero.video);
+  const vbtn = $('#heroVideoBtn');
+  vbtn.querySelector('span').textContent = video.text.trim() || DEFAULT_HERO.video.text;
+  vbtn.hidden = !video.show;
+  vbtn.classList.toggle('no-link', !videoLink(video.link));
+  (hero.photo.show ? $('#hero .hero-visual') : actions).appendChild(vbtn);
+  vbtn.classList.toggle('in-actions', !hero.photo.show);
+  if (!hero.photo.show && video.show && videoLink(video.link)) actions.hidden = false;
 }
 $('#hero .hero-actions').addEventListener('click', e => {
   const btn = e.target.closest('[data-open]');
   if (btn) openModal(btn.dataset.open);
+});
+$('#heroVideoBtn').addEventListener('click', () => {
+  const video = Object.assign(clone(DEFAULT_HERO.video), heroSaved.video);
+  playVideo(videoLink(video.link), video.text.trim() || DEFAULT_HERO.video.text,
+    role === 'admin' ? 'No video yet. Paste your Loom link in Hero (Top Section) → Video button.' : 'Video coming soon.');
 });
 // Editor changes only touch the draft
 function saveHero() { updateHeroResets(); markDirty(); }
@@ -1073,7 +1176,8 @@ function updateHeroResets() {
   const changed = {
     headline: heroText.headline !== defaultContent.headline, description: heroText.description !== defaultContent.description,
     badge: !same(hero.badge, DEFAULT_HERO.badge), stats: !same(hero.stats, DEFAULT_HERO.stats),
-    buttons: !same(hero.buttons, DEFAULT_HERO.buttons), photo: !same(hero.photo, DEFAULT_HERO.photo)
+    buttons: !same(hero.buttons, DEFAULT_HERO.buttons), photo: !same(hero.photo, DEFAULT_HERO.photo),
+    video: !same(hero.video, DEFAULT_HERO.video)
   };
   $$('[data-hero-reset]').forEach(btn => btn.disabled = !changed[btn.dataset.heroReset]);
 }
@@ -1106,8 +1210,69 @@ function renderHeroEditor() {
 
   $('#heroPhotoThumb').src = hero.photo.src || 'Romel Photo.jpg';
   $('#heroPhotoToggle').innerHTML = `<i class="fa-solid ${hero.photo.show ? 'fa-eye-slash' : 'fa-eye'} accent"></i><span>${hero.photo.show ? 'Hide Photo' : 'Show Photo'}</span>`;
+
+  hero.video = Object.assign(clone(DEFAULT_HERO.video), hero.video);
+  $('#heroVideoText').value = hero.video.text;
+  const uploaded = isUploadedVideo(hero.video.link);
+  $('#heroVideoLink').value = uploaded ? '' : hero.video.link;
+  $('#heroVideoFileRow').hidden = !uploaded;
+  $('#heroVideoFileName').textContent = uploaded ? (hero.video.fileName || hero.video.link.split('/').pop()) : '';
+  $('#uploadHeroVideo span').textContent = uploaded ? 'Replace Video File' : 'Upload Video File';
+  $('#heroVideoToggle').innerHTML = eyeIcon(hero.video.show);
+  $('#heroVideoToggle').closest('.tool-row').classList.toggle('is-off', !hero.video.show);
   updateHeroResets();
 }
+$('#heroVideoText').addEventListener('input', e => { hero.video.text = e.target.value; saveHero(); });
+$('#heroVideoLink').addEventListener('input', e => {
+  // Typing a link replaces an uploaded file
+  hero.video.link = e.target.value.trim();
+  delete hero.video.fileName;
+  $('#heroVideoFileRow').hidden = true;
+  $('#uploadHeroVideo span').textContent = 'Upload Video File';
+  saveHero();
+});
+$('#uploadHeroVideo').addEventListener('click', () => $('#heroVideoFile').click());
+$('#heroVideoFile').addEventListener('change', e => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  if (!/\.(mp4|m4v|mov|webm|ogg)$/i.test(file.name)) return toast('Please choose an MP4, MOV or WebM video.');
+  if (file.size > 95 * 1024 * 1024) return toast(`That video is ${Math.round(file.size / 1048576)} MB — the limit is 95 MB. Trim it or record at 1080p, then try again.`);
+  // Sent to the local server (saved in the project's videos/ folder), with a progress bar
+  const button = $('#uploadHeroVideo'), bar = $('#heroVideoProgress');
+  button.disabled = true;
+  bar.hidden = false;
+  bar.firstElementChild.style.width = '0%';
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', `/__upload-video?name=${encodeURIComponent(file.name)}`);
+  xhr.upload.onprogress = ev => { if (ev.lengthComputable) bar.firstElementChild.style.width = Math.round(ev.loaded / ev.total * 100) + '%'; };
+  const done = () => { button.disabled = false; bar.hidden = true; };
+  xhr.onload = () => {
+    done();
+    const path = xhr.responseText.trim();
+    if (xhr.status !== 200 || !isUploadedVideo(path)) return toast(xhr.status === 413 ? 'That video is too large (max 95 MB).' : 'Upload failed — open the site from http://localhost:8000 and try again.');
+    hero.video.link = path;
+    hero.video.fileName = file.name;
+    hero.video.show = true;
+    saveHero();
+    renderHeroEditor();
+    toast('Video uploaded — click Save changes to put it on the button.');
+  };
+  xhr.onerror = () => { done(); toast('Upload failed — open the site from http://localhost:8000 and try again.'); };
+  xhr.send(file);
+});
+$('#removeHeroVideoFile').addEventListener('click', () => {
+  hero.video.link = '';
+  delete hero.video.fileName;
+  saveHero();
+  renderHeroEditor();
+});
+$('#heroVideoToggle').addEventListener('click', () => { hero.video.show = !hero.video.show; saveHero(); renderHeroEditor(); });
+$('#testHeroVideo').addEventListener('click', () => {
+  const url = videoLink(hero.video.link);
+  if (hero.video.link && !url) return toast('Paste a full link that starts with https://');
+  playVideo(url, hero.video.text.trim() || DEFAULT_HERO.video.text, 'No video yet. Paste your Loom link above.');
+});
 
 // Text fields save as you type without rebuilding the editor (keeps the cursor in place)
 $('#heroHeadlineInput').addEventListener('input', e => { heroText.headline = e.target.value; saveHeadlineContent(); });
@@ -1559,7 +1724,9 @@ const EDITABLE = 'main h1, main h2, main h3, main h4, main p, main li, main .mon
 const OWN_EDITOR_AREAS_V2 = '#servicesGrid, #focusList';
 const OWN_EDITOR_AREAS = '#servicesGrid, #focusList, #hero .pill-badge, #hero .stat-grid, #hero .hero-actions';
 function collectEditables(skipAreas) {
+  // #heroVideoBtn has its own Hero setting and came later, so it never shifts the position keys
   const all = $$(EDITABLE).filter(el => !el.matches('[data-content], #heroHeadline, #heroDescription, #calNote') && !el.querySelector('[data-content]')
+    && !el.closest('#heroVideoBtn')
     && !(skipAreas && el.closest(skipAreas)));
   return all.filter(el => !all.some(other => other !== el && other.contains(el)));
 }
@@ -1973,6 +2140,57 @@ $('#toggleEdit').addEventListener('click', async () => {
   if (!on && !(await resolveUnsaved(['text']))) return;
   setEditing(on);
 });
+/* --- Edit Font: suggested font sets (defined in fonts.js). Clicking a set previews it on the page;
+       Apply keeps it, Cancel / closing the panel goes back to the saved set. --- */
+const FONTS = window.ROMEL_FONTS;
+let fontSaved = FONTS.saved, fontPick = fontSaved, fontFilter = 'all';
+const FONT_STYLE_LABEL = { original: 'Original', masculine: 'Masculine', feminine: 'Feminine' };
+const updateFontLabel = () => { $('#fontCurrentLabel').textContent = '· ' + FONTS.find(fontSaved).name; };
+function renderFontGrid() {
+  $$('[data-font-filter]').forEach(b => b.classList.toggle('active', b.dataset.fontFilter === fontFilter));
+  $('#fontGrid').innerHTML = FONTS.sets.filter(s => fontFilter === 'all' || s.style === fontFilter).map(s =>
+    `<button type="button" class="font-card${s.id === fontPick ? ' selected' : ''}" data-font-set="${s.id}">`
+    + '<span class="fc-check"><i class="fa-solid fa-check"></i></span>'
+    + `<span class="fc-top"><span class="fc-name">${escapeHtml(s.name)}</span><span class="fc-tag ${s.style}">${FONT_STYLE_LABEL[s.style]}</span></span>`
+    + `<span class="fc-label" style="font-family:${s.label.stack}">Resume &amp; Bio</span>`
+    + `<span class="fc-heading" style="font-family:${s.head.stack}">I build digital experiences</span>`
+    + `<span class="fc-body" style="font-family:${s.body.stack}">Creative developer turning ambitious ideas into fast, thoughtful products.</span>`
+    + `<span class="fc-note">${escapeHtml(s.note)}</span>`
+    + `<span class="fc-fonts"><span><b>Heading:</b> ${s.head.name}</span><span><b>Body:</b> ${s.body.name}</span><span><b>Label:</b> ${s.label.name}</span></span>`
+    + '</button>').join('');
+}
+function revertFontPreview() { fontPick = fontSaved; FONTS.apply(fontSaved); }
+$('#openFonts').addEventListener('click', () => {
+  FONTS.sets.forEach(FONTS.load); // every set's fonts, so the cards show their real look
+  fontPick = fontSaved;
+  fontFilter = 'all';
+  renderFontGrid();
+  openModal('fontModal');
+});
+$('#fontFilters').addEventListener('click', e => {
+  const btn = e.target.closest('[data-font-filter]');
+  if (!btn) return;
+  fontFilter = btn.dataset.fontFilter;
+  renderFontGrid();
+});
+$('#fontGrid').addEventListener('click', e => {
+  const card = e.target.closest('[data-font-set]');
+  if (!card) return;
+  fontPick = card.dataset.fontSet;
+  FONTS.apply(fontPick); // live preview on the page
+  renderFontGrid();
+});
+$('#applyFont').addEventListener('click', () => {
+  const set = FONTS.find(fontPick), changed = fontPick !== fontSaved;
+  fontSaved = fontPick;
+  try { fontSaved === 'original' ? localStorage.removeItem('romelFonts') : localStorage.setItem('romelFonts', fontSaved); } catch (err) {}
+  updateFontLabel();
+  closeModal($('#fontModal'), true);
+  if (changed) toast(`Font set "${set.name}" applied. Click Save Niche to publish it to clients.`);
+});
+$$('[data-font-cancel]').forEach(btn => btn.addEventListener('click', () => closeModal($('#fontModal'))));
+updateFontLabel();
+
 // Both panels resolve false if the admin chose "Keep editing"; an already-open panel keeps its draft
 async function openSectionsPanel() {
   if (!sectionsPanel.hidden) return true;
@@ -3019,7 +3237,7 @@ renderCardManager();
    A niche stores every admin setting; "Save Niche" writes them all to niches.js
    (via the local server), which every visitor loads. Links: ?niche=<slug>.
    ========================================================================== */
-const NICHE_KEYS = ['romelPageEditsV3', 'romelHiddenSections', 'romelPortfolioContent', 'romelTheme', 'romelThemeColors', 'romelThemeCache', 'romelLogo', 'romelBrand', 'romelTools', 'romelFocus', 'romelServices', 'romelCards', 'romelHero', 'romelImages', 'romelResume', 'romelSectionOrder', 'romelCustomSections', 'romelHiddenContent'];
+const NICHE_KEYS = ['romelPageEditsV3', 'romelHiddenSections', 'romelPortfolioContent', 'romelTheme', 'romelThemeColors', 'romelThemeCache', 'romelLogo', 'romelBrand', 'romelTools', 'romelFocus', 'romelServices', 'romelCards', 'romelHero', 'romelImages', 'romelResume', 'romelSectionOrder', 'romelCustomSections', 'romelHiddenContent', 'romelFonts'];
 let nicheData = JSON.parse(JSON.stringify(window.ROMEL_NICHES || { default: null, niches: {} }));
 if (!nicheData.niches) nicheData.niches = {};
 let pendingNiche = loadJSON('romelPendingNiche', null); // created in the panel but not saved yet
@@ -3446,6 +3664,7 @@ async function openSettingsFor(t) {
   if (within('#hero')) {
     const stat = within('#hero .stat'), btn = within('#hero .hero-actions .btn');
     if (!(await open('hero'))) return;
+    if (within('#heroVideoBtn')) return spotlight($('#heroVideoText').closest('.hero-group'), $('#heroVideoLink'));
     if (within('#hero .pill-badge')) return spotlight(rowOf($('#heroBadgeInput')), $('#heroBadgeInput'));
     if (within('#heroHeadline')) return spotlight($('#heroHeadlineInput'));
     if (within('#heroDescription')) return spotlight($('#heroDescInput'));
